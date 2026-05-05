@@ -62,6 +62,7 @@
       gap: 12px;
       margin-bottom: 30px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .wc-filter-btn {
       padding: 10px 28px;
@@ -83,6 +84,26 @@
       color: #fff;
       border-color: transparent;
       box-shadow: 0 4px 14px rgba(79,172,254,0.35);
+    }
+    .wc-refresh-btn {
+      padding: 10px 18px;
+      border-radius: 30px;
+      border: 2px solid #e0e0e0;
+      background: #fff;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #666;
+      margin-left: 8px;
+    }
+    .wc-refresh-btn:hover {
+      border-color: #3498db;
+      color: #3498db;
+    }
+    .wc-refresh-btn.refreshing {
+      pointer-events: none;
+      opacity: 0.6;
     }
     .wc-main-container {
       display: flex;
@@ -236,6 +257,9 @@
         <button class="wc-filter-btn active" data-wc="titles">🎬 电影标题</button>
         <button class="wc-filter-btn" data-wc="comments">💬 用户评论</button>
         <button class="wc-filter-btn" data-wc="genres">🏷️ 类型标签</button>
+        <button class="wc-refresh-btn" id="wcRefreshBtn" title="清除缓存并刷新数据">
+          <i class="icofont-refresh"></i> 刷新数据
+        </button>
       </div>
 
       <div class="wc-main-container" data-aos="fade-up">
@@ -397,20 +421,41 @@
       if (wcData.genres) { document.getElementById('statGenres').textContent = wcData.genres.length; }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function loadWordcloudData(refresh) {
       var chartDiv = document.getElementById('wcChart');
+      var btn = document.getElementById('wcRefreshBtn');
+      var url = '/api/bigdata/wordcloud/data';
+      if (refresh) {
+        url += '?refresh=1';
+        if (btn) {
+          btn.classList.add('refreshing');
+          btn.innerHTML = '<i class="icofont-spinner icofont-spin"></i> 刷新中...';
+        }
+      }
       chartDiv.innerHTML = '<div class="wc-loading"><i class="icofont-spinner icofont-spin"></i>正在加载词云数据...</div>';
 
-      fetch('/api/bigdata/wordcloud/data')
+      fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(res) {
           wcData = res;
           updateStats();
-          updateWordcloud('titles');
+          updateWordcloud(currentKey);
+          if (btn) {
+            btn.classList.remove('refreshing');
+            btn.innerHTML = '<i class="icofont-refresh"></i> 刷新数据';
+          }
         })
         .catch(function() {
           chartDiv.innerHTML = '<div class="wc-empty">数据加载失败，请刷新页面重试</div>';
+          if (btn) {
+            btn.classList.remove('refreshing');
+            btn.innerHTML = '<i class="icofont-refresh"></i> 刷新数据';
+          }
         });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadWordcloudData(false);
 
       document.querySelectorAll('.wc-filter-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -425,6 +470,10 @@
           };
           document.getElementById('wcRankTitle').textContent = titles[key] || '高频词汇 TOP 20';
         });
+      });
+
+      document.getElementById('wcRefreshBtn').addEventListener('click', function() {
+        loadWordcloudData(true);
       });
 
       window.addEventListener('resize', function() {

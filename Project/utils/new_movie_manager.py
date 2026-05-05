@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 import pandas as pd
 from typing import Optional, Tuple, List, Dict
 
@@ -48,6 +49,10 @@ class NewMovieManager:
             )
             conn.execute(
                 f"CREATE INDEX IF NOT EXISTS idx_new_year ON {self.TABLE}(year)"
+            )
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS wordcloud_cache ("
+                "cache_key TEXT PRIMARY KEY, data TEXT)"
             )
 
     def import_from_csv(self, csv_path: str) -> int:
@@ -181,3 +186,63 @@ class NewMovieManager:
         titles = [r["title"] for r in rows if r["title"]]
         summaries = [r["summary"] for r in rows if r["summary"]]
         return titles, summaries
+
+    def _load_wc_cache(self) -> Optional[Dict]:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT data FROM wordcloud_cache WHERE cache_key = 'all'"
+            ).fetchone()
+        if row:
+            return json.loads(row["data"])
+        return None
+
+    def _save_wc_cache(self, data: Dict):
+        with self._get_conn() as conn:
+            conn.execute(
+                "DELETE FROM wordcloud_cache WHERE cache_key = 'all'"
+            )
+            conn.execute(
+                "INSERT INTO wordcloud_cache (cache_key, data) VALUES ('all', ?)",
+                (json.dumps(data, ensure_ascii=False),)
+            )
+
+    def get_wordcloud_data(self, force_refresh: bool = False) -> Dict:
+        if not force_refresh:
+            cached = self._load_wc_cache()
+            if cached:
+                return cached
+
+        import jieba
+
+        titles, summaries = self.get_wordcloud_texts()
+
+        stop_words = {
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
+            "一个", "上", "也", "很", "说", "要", "你", "会", "着", "没有", "看",
+            "好", "自己", "这", "他", "她", "们", "那", "什么", "怎么", "可以",
+            "还", "被", "让", "从", "与", "但", "而", "等", "及", "之", "为",
+            "对", "于", "以", "电影", "一部", "真的", "感觉", "觉得", "还是", "不过",
+            "已经", "不是", "就是", "这么", "那么", "一直", "一点", "很多",
+            "出来", "开始", "最后", "比较", "其实", "有点", "因为", "所以",
+            "我们", "他们", "你们", "大家", "但是", "然而", "配音", "一次", "为了", "这个",
+            "本片", "一场", "一起",
+        }
+
+        def count_chinese_words(texts, top_n=50):
+            freq = {}
+            for text in texts:
+                words = jieba.lcut(str(text))
+                for w in words:
+                    w = w.strip("，。！？；：""''（）【】《》、…—·,.!?;:()[]{}<>\"'|/\\@#$%^&*+=~` \t")
+                    if len(w) >= 2 and any('\u4e00' <= c <= '\u9fff' for c in w):
+                        if w not in stop_words:
+                            freq[w] = freq.get(w, 0) + 1
+            return [{"name": w, "value": c}
+                    for w, c in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:top_n]]
+
+        result = {
+            "titles": count_chinese_words(titles),
+            "summaries": count_chinese_words(summaries),
+        }
+        self._save_wc_cache(result)
+        return result

@@ -15,12 +15,13 @@
   <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='assets/js/echarts.min.js') }}"></script>
 
   <style>
     body { display: flex; flex-direction: column; min-height: 100vh; }
     #footer { margin-top: auto; }
-    #team.team { flex: 1; }
-    .rec-search { text-align: center; margin-bottom: 30px; }
+    #team.team { flex: 1; padding-bottom: 60px; }
+    .rec-search { text-align: center; margin-bottom: 16px; }
     .rec-search input {
       width: 55%; max-width: 480px; padding: 12px 20px;
       border-radius: 50px; border: 1px solid #ddd;
@@ -34,26 +35,108 @@
       transition: all 0.3s;
     }
     .rec-search button:hover { box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+    .model-tabs {
+      display: flex; justify-content: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .model-tab {
+      padding: 10px 22px; border-radius: 30px; border: 1.5px solid #ddd;
+      background: #fff; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      transition: all 0.25s; color: #666; white-space: nowrap;
+    }
+    .model-tab:hover { border-color: #3b82f6; color: #3b82f6; }
+    .model-tab.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+    .model-tab-sub {
+      display: block; font-size: 0.68rem; font-weight: 400; opacity: 0.7; margin-top: 2px;
+    }
+    .rec-info-box {
+      background: #eff6ff; border-radius: 12px; padding: 16px 20px;
+      margin-bottom: 20px; text-align: center; color: #3b82f6;
+    }
+    .rec-info-box h5 { margin: 0; font-weight: 600; }
+    .rec-info-box p { margin: 4px 0 0; font-size: 0.82rem; opacity: 0.8; }
     .rec-result { margin-top: 20px; }
     .rec-card {
       background: #fff; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-      padding: 18px 22px; margin-bottom: 12px;
-      display: flex; align-items: center; transition: transform 0.2s;
+      padding: 16px 20px; margin-bottom: 10px;
+      display: flex; align-items: center; transition: transform 0.2s; cursor: pointer;
     }
     .rec-card:hover { transform: translateX(4px); }
-    .rec-rank { width: 36px; height: 36px; line-height: 36px; text-align: center; border-radius: 50%;
-      background: #eff6ff; color: #3b82f6; font-weight: 700; margin-right: 14px; flex-shrink: 0; }
+    .rec-rank { width: 34px; height: 34px; line-height: 34px; text-align: center; border-radius: 50%;
+      background: #eff6ff; color: #3b82f6; font-weight: 700; margin-right: 14px; flex-shrink: 0; font-size: 0.9rem; }
     .rec-rank.top3 { background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff; }
     .rec-name { flex: 1; font-weight: 600; color: #333; }
-    .rec-score { font-weight: 600; color: #3b82f6; font-size: 0.95rem; }
+    .rec-reason { font-size: 0.78rem; color: #999; margin-left: 12px; flex-shrink: 0; max-width: 220px; text-align: right; }
+    .rec-score { font-weight: 600; color: #3b82f6; font-size: 0.9rem; margin-left: 14px; flex-shrink: 0; }
     .rec-empty { text-align: center; padding: 60px; color: #999; }
     .rec-loading { text-align: center; padding: 40px; color: #999; }
-    .rec-info-box {
-      background: #eff6ff; border-radius: 12px; padding: 18px 22px;
-      margin-bottom: 24px; text-align: center; color: #3b82f6;
+    .eval-badge {
+      display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.72rem;
+      padding: 2px 8px; border-radius: 8px; margin-left: 6px;
     }
-    .rec-info-box h5 { margin: 0; font-weight: 600; }
-    .rec-info-box p { margin: 6px 0 0; font-size: 0.85rem; opacity: 0.8; }
+    .compare-cards { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; justify-content: center; }
+    .compare-card {
+      flex: 1; min-width: 200px; max-width: 300px;
+      background: #fff; border-radius: 14px; padding: 20px 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06); text-align: center;
+      transition: transform 0.25s; border-top: 4px solid #e5e7eb;
+    }
+    .compare-card:hover { transform: translateY(-4px); }
+    .compare-card.card-tfidf { border-top-color: #3b82f6; }
+    .compare-card.card-svd { border-top-color: #10b981; }
+    .compare-card.card-sbert { border-top-color: #8b5cf6; }
+    .compare-card .cc-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; color: #333; }
+    .compare-card .cc-sub { font-size: 0.72rem; color: #999; margin-bottom: 14px; }
+    .compare-card .cc-metric { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.82rem; color: #555; border-bottom: 1px dashed #f0f0f0; }
+    .compare-card .cc-metric:last-child { border-bottom: none; }
+    .compare-card .cc-val { font-weight: 700; color: #333; }
+    .compare-card .cc-loading { font-size: 0.82rem; color: #bbb; }
+    .chart-container { width: 100%; max-width: 700px; height: 450px; margin: 0 auto 28px; }
+    .section-divider { border-top: 1px solid #eee; margin: 32px auto 24px; max-width: 900px; }
+    .movie-modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 9999; display: flex;
+      align-items: center; justify-content: center;
+      opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s;
+    }
+    .movie-modal-overlay.active { opacity: 1; visibility: visible; }
+    .movie-modal {
+      background: #fff; border-radius: 16px; width: 90%; max-width: 560px;
+      max-height: 85vh; overflow-y: auto; padding: 28px 32px;
+      position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      transform: translateY(20px); transition: transform 0.3s;
+    }
+    .movie-modal-overlay.active .movie-modal { transform: translateY(0); }
+    .movie-modal-close {
+      position: absolute; top: 12px; right: 18px;
+      width: 32px; height: 32px; line-height: 32px; text-align: center;
+      border-radius: 50%; border: none; background: #f3f4f6;
+      font-size: 1.1rem; color: #666; cursor: pointer; transition: all 0.2s;
+    }
+    .movie-modal-close:hover { background: #e5e7eb; color: #333; }
+    .movie-modal-header { margin-bottom: 20px; }
+    .movie-modal-title { font-size: 1.25rem; font-weight: 700; color: #1f2937; margin: 0 0 4px 0; }
+    .movie-modal-year { font-size: 0.82rem; color: #9ca3af; font-weight: 400; }
+    .movie-modal-score {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fef3c7; color: #92400e; padding: 4px 12px;
+      border-radius: 20px; font-size: 0.85rem; font-weight: 700; margin-bottom: 16px;
+    }
+    .movie-modal-detail { margin-bottom: 14px; }
+    .movie-modal-detail dt {
+      font-size: 0.78rem; font-weight: 600; color: #9ca3af; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .movie-modal-detail dd { margin: 0 0 12px 0; font-size: 0.9rem; color: #374151; line-height: 1.6; }
+    .movie-modal-loading {
+      text-align: center; padding: 40px 0; color: #9ca3af; font-size: 0.9rem;
+    }
+    .movie-modal-error {
+      text-align: center; padding: 40px 0; color: #ef4444; font-size: 0.9rem;
+    }
+    @media (max-width: 576px) {
+      .movie-modal { padding: 20px 18px; width: 95%; }
+      .movie-modal-title { font-size: 1.05rem; }
+    }
   </style>
 </head>
 
@@ -79,13 +162,25 @@
     <div class="container">
 
       <div class="section-title">
-        <h2>电影推荐系统</h2>
-        <p>基于 TF-IDF 内容特征的电影相似度推荐 — 输入电影名，发现相似好片</p>
+        <h2>多模型电影推荐系统</h2>
+        <p>三组推荐模型对比实验 — 覆盖内容推荐、协同过滤与深度语义三种范式</p>
       </div>
 
-      <div class="rec-info-box" data-aos="fade-up">
-        <h5>内容推荐模式</h5>
-        <p>基于电影的类型、导演、演员和剧情简介构建特征向量，通过余弦相似度匹配最相近的电影</p>
+      <div class="rec-info-box" data-aos="fade-up" id="modelInfoBox">
+        <h5 id="modelTitle">TF-IDF 内容推荐</h5>
+        <p id="modelDesc">基于扩展后的 27,304 部电影库，提取类型/导演/演员/简介等文本特征的 TF-IDF 向量，通过余弦相似度推荐最相近的电影。覆盖范围最广，无需用户交互数据。</p>
+      </div>
+
+      <div class="model-tabs" data-aos="fade-up">
+        <div class="model-tab active" onclick="switchModel('tfidf')">
+          TF-IDF 内容推荐<span class="model-tab-sub">文本特征 · 27,304 部</span>
+        </div>
+        <div class="model-tab" onclick="switchModel('svd')">
+          SVD 协同过滤<span class="model-tab-sub">评分矩阵降维 · 隐语义</span>
+        </div>
+        <div class="model-tab" onclick="switchModel('sbert')">
+          BGE-Large-Zh<span class="model-tab-sub">深度语义 · 1024维 · GPU</span>
+        </div>
       </div>
 
       <div class="rec-search" data-aos="fade-up">
@@ -95,13 +190,39 @@
       </div>
 
       <div id="recLoading" class="rec-loading" style="display:none;">
-        <i class="icofont-spinner icofont-spin"></i> 正在分析...
+        <i class="icofont-spinner icofont-spin"></i> <span id="recLoadingText">正在分析...</span>
       </div>
 
       <div id="recResults" class="rec-result"></div>
 
+      <div class="section-divider"></div>
+
+      <div class="section-title" data-aos="fade-up">
+        <h3>模型对比分析</h3>
+        <p>三组模型在统一测试集（200 部电影）上的离线评估指标</p>
+      </div>
+
+      <div class="chart-container" id="chartMetrics" data-aos="fade-up">
+        <div class="rec-loading" id="chartLoading">
+          <i class="icofont-spinner icofont-spin"></i> 正在加载评估数据...
+        </div>
+      </div>
+
+      <div class="compare-cards" id="compareCards" data-aos="fade-up"></div>
+
     </div>
   </section>
+
+  <div class="movie-modal-overlay" id="movieModalOverlay">
+    <div class="movie-modal">
+      <button class="movie-modal-close" id="movieModalClose">&times;</button>
+      <div id="movieModalContent">
+        <div class="movie-modal-loading">
+          <i class="icofont-spinner icofont-spin"></i> 正在加载电影详情...
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer id="footer">
     <div class="container"><div class="copyright">&copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved</div></div>
@@ -111,16 +232,40 @@
   <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
   <script>
-    var contentReady = false;
+    AOS.init();
+
+    var currentModel = 'tfidf';
+    var chartMetrics = null;
+
+    var MODEL_INFO = {
+      tfidf: {
+        title: 'TF-IDF 内容推荐',
+        desc: '融合双数据库 27,304 部电影，8000 维 TF-IDF 特征 + n-gram 短语特征，字段加权（类型×2、导演×2、演员×2、标签×2），评分融合排序。作为内容推荐基线，无需用户交互数据，适合冷启动场景。',
+      },
+      svd: {
+        title: 'TruncatedSVD 协同过滤',
+        desc: '基于用户评分矩阵的截断 SVD 分解（128 维隐语义空间），对评分稀疏矩阵进行降维获得电影的隐向量表示，item-to-item 余弦相似度推荐。纯 CPU 计算，零新依赖，适合有交互数据的热门电影。',
+      },
+      sbert: {
+        title: 'BGE-Large-Zh 深度语义推荐',
+        desc: '使用 BAAI/bge-large-zh-v1.5（326M 参数, 1024 维向量, FP16 加速），北京智源人工智能研究院出品，C-MTEB 中文语义评测顶尖水平。对包含类型/导演/剧情/评分/标签的文本进行深层中文语义编码，捕捉传统关键词无法表达的语义关联。GPU 加速推理，适合跨类型、跨年代的语义关联发现。',
+      }
+    };
+
+    function switchModel(model) {
+      currentModel = model;
+      document.querySelectorAll('.model-tab').forEach(function(t) { t.classList.remove('active'); });
+      var tabs = document.querySelectorAll('.model-tab');
+      var idx = {tfidf: 0, svd: 1, sbert: 2}[model];
+      if (idx !== undefined) tabs[idx].classList.add('active');
+      var info = MODEL_INFO[model];
+      document.getElementById('modelTitle').textContent = info.title;
+      document.getElementById('modelDesc').textContent = info.desc;
+      document.getElementById('recResults').innerHTML = '';
+    }
 
     function doSearch() {
       var movie = document.getElementById('movieInput').value.trim();
@@ -129,26 +274,43 @@
       document.getElementById('recLoading').style.display = 'block';
       document.getElementById('recResults').innerHTML = '';
 
-      fetch('/api/analysis/recommend/by_movie?movie=' + encodeURIComponent(movie))
+      var url = '/api/analysis/recommend/by_movie?movie=' + encodeURIComponent(movie) + '&model=' + currentModel;
+
+      fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(d) {
           document.getElementById('recLoading').style.display = 'none';
           if (d.status === 'warming') {
             document.getElementById('recResults').innerHTML =
-              '<div class="rec-empty">推荐引擎正在预热中，请等待约 30 秒后重试...</div>';
+              '<div class="rec-empty">引擎正在预热，请等待约 30 秒后重试...</div>';
             return;
           }
           if (!d.results || d.results.length === 0) {
+            var msg = d.message || ('未找到与 <strong>' + d.query + '</strong> 相似的电影');
             document.getElementById('recResults').innerHTML =
-              '<div class="rec-empty">未找到与 "' + d.query + '" 相似的电影</div>';
+              '<div class="rec-empty">' + msg + '</div>';
             return;
           }
-          var h = '<h5 style="margin-bottom:14px;color:#555;">与 <strong style="color:#3b82f6;">' + d.query + '</strong> 相似的电影 TOP ' + d.results.length + '</h5>';
+
+          var modelLabel = {'tfidf': 'TF-IDF', 'svd': 'SVD 协同过滤', 'sbert': 'BGE-Large-Zh'}[d.model] || d.model;
+          var info = '';
+          if (d.movie_count) {
+            info = '<span class="eval-badge">电影库 ' + d.movie_count + ' 部</span>';
+          }
+
+          var h = '<h5 style="margin-bottom:14px;color:#555;">[' + modelLabel + '] 与 <strong style="color:#3b82f6;">' + d.query + '</strong> 相似的电影 ' + info + '</h5>';
           d.results.forEach(function(m, i) {
-            h += '<div class="rec-card" data-aos="fade-up">' +
+            var simText = '';
+            if (m.similarity !== undefined && m.similarity !== null) {
+              simText = (m.similarity * 100).toFixed(0) + '%';
+            }
+            var reasonText = m.reason || '';
+            var safeName = m.name.replace(/'/g, "&#39;");
+            h += '<div class="rec-card" data-aos="fade-up" data-movie-name="' + safeName + '" onclick="openMovieModal(\'' + safeName + '\')">' +
               '<span class="rec-rank' + (i < 3 ? ' top3' : '') + '">' + (i + 1) + '</span>' +
               '<span class="rec-name">' + m.name + '</span>' +
-              '<span class="rec-score">相似度 ' + (m.similarity * 100).toFixed(0) + '%</span>' +
+              (reasonText ? '<span class="rec-reason">' + reasonText + '</span>' : '') +
+              (simText ? '<span class="rec-score">' + simText + '</span>' : '') +
             '</div>';
           });
           document.getElementById('recResults').innerHTML = h;
@@ -158,6 +320,177 @@
           document.getElementById('recResults').innerHTML = '<div class="rec-empty">查询失败，请稍后重试</div>';
         });
     }
+
+    function loadEvalReport() {
+      fetch('/api/analysis/recommend/eval')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var ld = document.getElementById('chartLoading');
+          if (ld) ld.style.display = 'none';
+          if (d.error) return;
+          renderCompareCards(d.models);
+          renderMetricsChart(d.models);
+        }).catch(function() {});
+    }
+
+    function renderCompareCards(models) {
+      var order = ['TF-IDF', 'TruncatedSVD', 'BGE-Large-Zh'];
+      var cssMap = {'TF-IDF': 'card-tfidf', 'TruncatedSVD': 'card-svd', 'BGE-Large-Zh': 'card-sbert'};
+      var labelMap = {'TF-IDF': 'TF-IDF 内容推荐', 'TruncatedSVD': 'SVD 协同过滤', 'BGE-Large-Zh': 'BGE-Large-Zh 深度语义'};
+      var subMap = {'TF-IDF': '文本特征 · 无需交互', 'TruncatedSVD': '评分矩阵降维 · 隐语义空间', 'BGE-Large-Zh': '深度语义 · 1024维 · FP16'};
+
+      var h = '';
+      order.forEach(function(name) {
+        var m = models[name];
+        if (!m) return;
+        h += '<div class="compare-card ' + (cssMap[name] || '') + '">';
+        h += '<div class="cc-title">' + (labelMap[name] || name) + '</div>';
+        h += '<div class="cc-sub">' + (subMap[name] || '') + '</div>';
+        h += '<div class="cc-metric"><span>Genre Prec@10</span><span class="cc-val">' + (m["genre_precision@10"] !== undefined ? m["genre_precision@10"].toFixed(4) : (m["precision@10"] !== undefined ? m["precision@10"].toFixed(4) : '-')) + '</span></div>';
+        h += '<div class="cc-metric"><span>Tag-Actor Rec@10</span><span class="cc-val">' + (m["tag_actor_recall@10"] !== undefined ? m["tag_actor_recall@10"].toFixed(4) : '-') + '</span></div>';
+        h += '<div class="cc-metric"><span>Rating Quality</span><span class="cc-val">' + (m["rating_quality"] !== undefined ? m["rating_quality"].toFixed(4) : '-') + '</span></div>';
+        h += '<div class="cc-metric"><span>Coverage</span><span class="cc-val">' + (m.coverage !== undefined ? m.coverage.toFixed(4) : '-') + '</span></div>';
+        h += '<div class="cc-metric"><span>Diversity</span><span class="cc-val">' + (m.diversity !== undefined ? m.diversity.toFixed(4) : '-') + '</span></div>';
+        if (m.movie_count) {
+          h += '<div class="cc-metric"><span>电影数量</span><span class="cc-val">' + m.movie_count + '</span></div>';
+        }
+        h += '</div>';
+      });
+      document.getElementById('compareCards').innerHTML = h;
+    }
+
+    function renderMetricsChart(models) {
+      var container = document.getElementById('chartMetrics');
+      if (!chartMetrics) chartMetrics = echarts.init(container);
+
+      var names = ['TF-IDF', 'TruncatedSVD', 'BGE-Large-Zh'];
+      var present = names.filter(function(n) { return models[n]; });
+      var colors = ['#3b82f6', '#10b981', '#8b5cf6'];
+
+      var indicator = [
+        { name: 'Genre Prec', max: 1 },
+        { name: 'Tag-Actor Rec', max: 1 },
+        { name: 'Rating Quality', max: 1 },
+        { name: 'Coverage', max: 0.1 },
+        { name: 'Diversity', max: 1 }
+      ];
+
+      var seriesData = present.map(function(name, i) {
+        var m = models[name];
+        return {
+          name: name,
+          value: [
+            m["genre_precision@10"] || m["precision@10"] || 0,
+            m["tag_actor_recall@10"] || 0,
+            m["rating_quality"] || 0,
+            m.coverage || 0,
+            m.diversity || 0
+          ],
+          lineStyle: { color: colors[i], width: 2 },
+          areaStyle: { color: colors[i], opacity: 0.1 },
+          itemStyle: { color: colors[i] }
+        };
+      });
+
+      var option = {
+        tooltip: { trigger: 'item' },
+        legend: {
+          data: present,
+          bottom: 0
+        },
+        radar: {
+          center: ['50%', '50%'],
+          radius: '65%',
+          indicator: indicator,
+          axisName: { fontSize: 10, color: '#666' }
+        },
+        series: [{
+          type: 'radar',
+          data: seriesData
+        }]
+      };
+      chartMetrics.setOption(option);
+    }
+
+    window.addEventListener('resize', function() {
+      if (chartMetrics) chartMetrics.resize();
+    });
+
+    loadEvalReport();
+
+    var overlay = document.getElementById('movieModalOverlay');
+    var modalContent = document.getElementById('movieModalContent');
+    var modalCloseBtn = document.getElementById('movieModalClose');
+
+    function openMovieModal(movieName) {
+      overlay.classList.add('active');
+      modalContent.innerHTML = '<div class="movie-modal-loading"><i class="icofont-spinner icofont-spin"></i> 正在加载电影详情...</div>';
+
+      fetch('/api/movie/detail?name=' + encodeURIComponent(movieName))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) {
+            modalContent.innerHTML = '<div class="movie-modal-error">' + d.error + '</div>';
+            return;
+          }
+          var ratingStars = '';
+          if (d.rating) {
+            var stars = Math.round(d.rating / 2);
+            for (var s = 0; s < 5; s++) {
+              ratingStars += s < stars ? '\u2605' : '\u2606';
+            }
+          }
+          var html = '<div class="movie-modal-header">' +
+            '<h3 class="movie-modal-title">' + d.title + '</h3>' +
+            '<span class="movie-modal-year">' + (d.year || '') + '</span>' +
+            '</div>';
+          if (d.rating) {
+            html += '<div class="movie-modal-score">' +
+              '\u2B50 ' + d.rating.toFixed(1) + ' ' + ratingStars + ' &nbsp;|&nbsp; ' + (d.votes || 0) + ' 人评价' +
+              '</div>';
+          }
+          html += '<dl>';
+          if (d.directors) {
+            html += '<div class="movie-modal-detail"><dt>导演</dt><dd>' + d.directors + '</dd></div>';
+          }
+          if (d.actors) {
+            html += '<div class="movie-modal-detail"><dt>主演</dt><dd>' + d.actors + '</dd></div>';
+          }
+          if (d.genres) {
+            html += '<div class="movie-modal-detail"><dt>类型</dt><dd>' + d.genres + '</dd></div>';
+          }
+          if (d.country) {
+            html += '<div class="movie-modal-detail"><dt>制片国家/地区</dt><dd>' + d.country + '</dd></div>';
+          }
+          if (d.languages) {
+            html += '<div class="movie-modal-detail"><dt>语言</dt><dd>' + d.languages + '</dd></div>';
+          }
+          if (d.summary) {
+            html += '<div class="movie-modal-detail"><dt>剧情简介</dt><dd>' + d.summary + '</dd></div>';
+          }
+          if (d.tags) {
+            html += '<div class="movie-modal-detail"><dt>标签</dt><dd>' + d.tags + '</dd></div>';
+          }
+          html += '</dl>';
+          modalContent.innerHTML = html;
+        }).catch(function() {
+          modalContent.innerHTML = '<div class="movie-modal-error">电影详情加载失败，请稍后重试</div>';
+        });
+    }
+
+    function closeMovieModal() {
+      overlay.classList.remove('active');
+    }
+
+    modalCloseBtn.addEventListener('click', closeMovieModal);
+
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeMovieModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && overlay.classList.contains('active')) closeMovieModal();
+    });
   </script>
 
 </body>

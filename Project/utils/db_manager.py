@@ -3,6 +3,7 @@ import os
 import json
 import csv
 import re
+import jieba
 import pandas as pd
 from typing import Optional, Tuple, List, Dict
 
@@ -97,6 +98,9 @@ class DBManager:
             """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_cvalid_mid ON comments_valid(movie_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cvalid_cid ON comments_valid(comment_id)"
             )
             ccnt = conn.execute("SELECT COUNT(*) FROM comments_valid").fetchone()[0]
             print(f"  [comments_valid] 构建完成，有效评论 {ccnt} 条", flush=True)
@@ -407,6 +411,10 @@ class DBManager:
         result = {}
 
         with self._get_conn() as conn:
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cvalid_cid ON comments_valid(comment_id)"
+            )
+
             titles = conn.execute(
                 "SELECT name FROM movies_valid WHERE name != ''"
             ).fetchall()
@@ -418,33 +426,78 @@ class DBManager:
             ).fetchall()
             result["genres"] = self._count_genres(genres, top_n=30)
 
-            max_id = conn.execute("SELECT MAX(comment_id) FROM comments_valid").fetchone()[0] or 1
-            sample_count = 20000
-            sample_ids = set()
-            import random as _random
-            while len(sample_ids) < sample_count:
-                sid = _random.randint(1, max_id)
-                sample_ids.add(sid)
-
-            placeholders = ",".join("?" for _ in sample_ids)
-            comment_rows = conn.execute(
-                f"SELECT content FROM comments_valid WHERE content != '' AND comment_id IN ({placeholders})",
-                list(sample_ids)
-            ).fetchall()
-
-            comment_text = " ".join(r["content"] for r in comment_rows if r["content"])
-            result["comments"] = self._count_words(comment_text, top_n=80, chinese_only=True)
+            total_comments = conn.execute(
+                "SELECT COUNT(*) FROM comments_valid WHERE content != ''"
+            ).fetchone()[0]
+            batch_size = 50000
+            comment_freq = {}
+            stop_words = self._get_stop_words()
+            last_id = 0
+            while True:
+                rows = conn.execute(
+                    "SELECT comment_id, content FROM comments_valid "
+                    "WHERE content != '' AND comment_id > ? "
+                    "ORDER BY comment_id LIMIT ?",
+                    (last_id, batch_size)
+                ).fetchall()
+                if not rows:
+                    break
+                last_id = rows[-1]["comment_id"]
+                for row in rows:
+                    words = jieba.lcut(str(row["content"]))
+                    for w in words:
+                        w = w.strip("，。！？；：""''（）【】《》、…—·,.!?;:()[]{}<>\"'|/\\@#$%^&*+=~` \t")
+                        if len(w) >= 2 and any('\u4e00' <= c <= '\u9fff' for c in w):
+                            if w not in stop_words:
+                                comment_freq[w] = comment_freq.get(w, 0) + 1
+            result["comments"] = [
+                {"name": w, "value": c}
+                for w, c in sorted(comment_freq.items(), key=lambda x: x[1], reverse=True)[:80]
+            ]
 
             total_movies = conn.execute(
                 "SELECT COUNT(*) FROM movies_valid"
             ).fetchone()[0]
-            total_comments = conn.execute("SELECT COUNT(*) FROM comments_valid").fetchone()[0]
             result["stats"] = {
                 "total_movies": total_movies,
                 "total_comments": total_comments,
             }
 
         return result
+
+    def _get_stop_words(self):
+        return {
+            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
+            "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
+            "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
+            "什么", "怎么", "如何", "为什么", "因为", "所以", "但是", "然而",
+            "可以", "这个", "那个", "还", "被", "把", "让", "从", "与", "或",
+            "等", "及", "之", "为", "对", "于", "以", "而", "且", "但",
+            "a", "an", "the", "is", "are", "was", "were", "be", "been",
+            "being", "have", "has", "had", "do", "does", "did", "will",
+            "would", "could", "should", "may", "might", "can", "shall",
+            "to", "of", "in", "for", "on", "with", "at", "by", "from",
+            "it", "its", "and", "or", "not", "no", "but", "if", "so",
+            "as", "we", "he", "she", "they", "this", "that", "these",
+            "those", "my", "your", "his", "her", "our", "their", "all",
+            "than", "then", "just", "about", "into", "over", "also",
+            "very", "too", "only", "more", "some", "any", "each", "every",
+            "both", "few", "most", "other", "such", "now", "up", "out",
+            "when", "who", "how", "what", "which", "where", "there",
+            "here", "one", "two", "like", "get", "got", "make", "made",
+            "through", "after", "before", "between", "during", "while",
+            "电影", "一部", "真的", "感觉", "觉得", "还是", "不过", "已经",
+            "不是", "就是", "或者", "这么", "那么", "一直", "一点", "很多",
+            "出来", "开始", "最后", "比较", "其实", "有点", "东西", "地方",
+            "因为", "所以", "我们", "他们", "你们", "它们", "自己", "大家",
+            "配音", "一次", "为了", "这个", "本片", "一场", "一起",
+            "不错", "喜欢", "好看", "还行", "一般", "不错看",
+            "演技", "剧情", "导演", "演员", "角色", "故事", "片子", "画面",
+            "觉得", "看到", "知道", "可能", "应该", "这种", "那种",
+            "里面", "那种", "整个", "有人", "一种", "里面", "完全",
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "10", "20", "30", "100", "200",
+        }
 
     def _count_words(self, text: str, top_n: int = 80, chinese_only: bool = False) -> List[Dict]:
         freq = {}

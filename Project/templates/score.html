@@ -116,11 +116,17 @@
           </div>
         </div>
 
+        <div class="chart-controls mb-3">
+          <button class="btn btn-warning btn-sm" id="globalRefreshBtn" onclick="rebuildCache()">
+            <i class="icofont-refresh"></i> 清除缓存并重建全部图表
+          </button>
+          <span id="refreshStatus" style="margin-left:12px;font-size:0.85rem;color:#999;"></span>
+        </div>
+
         <!-- 评分分布图 -->
         <div class="chart-container">
           <div class="chart-title">📊 评分分布分析</div>
           <div class="chart-controls">
-            <button class="btn btn-primary btn-sm" onclick="refreshChart('rating')">刷新数据</button>
             <button class="btn btn-outline-secondary btn-sm" onclick="resetZoom('rating')">重置缩放</button>
           </div>
           <div id="rating-chart" style="width: 100%; height: 400px;"></div>
@@ -130,7 +136,6 @@
         <div class="chart-container">
           <div class="chart-title">📅 上映年份趋势</div>
           <div class="chart-controls">
-            <button class="btn btn-primary btn-sm" onclick="refreshChart('year')">刷新数据</button>
             <button class="btn btn-outline-secondary btn-sm" onclick="resetZoom('year')">重置缩放</button>
           </div>
           <div id="year-chart" style="width: 100%; height: 400px;"></div>
@@ -156,7 +161,6 @@
         <div class="chart-container">
           <div class="chart-title">🎬 导演作品数量排名</div>
           <div class="chart-controls">
-            <button class="btn btn-primary btn-sm" onclick="refreshChart('director')">刷新数据</button>
           </div>
           <div id="director-chart" style="width: 100%; height: 450px;"></div>
         </div>
@@ -181,135 +185,67 @@
   <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
   
   <script>
-    // 图表实例
     let charts = {};
-    
-    // 初始化所有图表
+
     $(document).ready(function() {
-      loadAllCharts();
-      loadStatistics();
+      loadAllCharts(false);
     });
 
-    // 加载统计信息
-    async function loadStatistics() {
+    async function loadAllCharts(refresh) {
       try {
-        const response = await fetch('/api/charts/all');
+        var url = '/api/charts/all';
+        if (refresh) url += '?refresh=1';
+        const response = await fetch(url);
         const data = await response.json();
-        
-        if (data.rating_distribution) {
-          // 计算平均评分
-          const ratingData = data.rating_distribution.series[0].data;
-          const xAxis = data.rating_distribution.xAxis.data;
-          let totalMovies = 0;
-          let weightedSum = 0;
-          
-          for (let i = 0; i < ratingData.length; i++) {
-            const range = xAxis[i].split('-');
-            const avgRating = (parseFloat(range[0]) + parseFloat(range[1])) / 2;
-            weightedSum += avgRating * ratingData[i];
-            totalMovies += ratingData[i];
-          }
-          
-          const avgRating = (weightedSum / totalMovies).toFixed(2);
-          $('#avg-rating').text(avgRating);
-        }
-        
-        if (data.year_distribution) {
-          // 计算最早年份
-          const yearLabels = data.year_distribution.xAxis.data;
-          const years = yearLabels.map(label => parseInt(label));
-          const earliestYear = Math.min(...years);
-          $('#earliest-year').text(earliestYear);
-        }
-        
-        if (data.country_distribution) {
-          // 计算涉及国家数量
-          const countryData = data.country_distribution.series[0].data;
-          
-          // 提取所有国家名称（处理多个国家组合的情况）
-          const allCountries = new Set();
-          countryData.forEach(item => {
-            const countryNames = item.name.split(/\s+/); // 按空格分割
-            countryNames.forEach(name => {
-              if (name && name !== "其他") {
-                // 将中国各地区统一为中国
-                let normalizedName = name.trim();
-                if (normalizedName === "中国大陆" || normalizedName === "中国香港" || 
-                    normalizedName === "中国澳门" || normalizedName === "中国台湾") {
-                  normalizedName = "中国";
-                }
-                allCountries.add(normalizedName);
-              }
-            });
-          });
-          
-          const countryCount = allCountries.size;
-          $('#country-count').text(countryCount);
-        }
-        
-      } catch (error) {
-        console.error('加载统计信息失败:', error);
-      }
-    }
 
-    // 加载所有图表
-    async function loadAllCharts() {
-      try {
-        const response = await fetch('/api/charts/all');
-        const data = await response.json();
-        
-        // 初始化评分分布图
-        charts.rating = echarts.init(document.getElementById('rating-chart'));
-        charts.rating.setOption(data.rating_distribution);
-        
-        // 初始化年份分布图
-        charts.year = echarts.init(document.getElementById('year-chart'));
-        charts.year.setOption(data.year_distribution);
-        
-        // 初始化国家分布图
-        charts.country = echarts.init(document.getElementById('country-chart'));
-        charts.country.setOption(data.country_distribution);
-        
-        // 初始化类型分布图
-        charts.genre = echarts.init(document.getElementById('genre-chart'));
-        charts.genre.setOption(data.genre_distribution);
-        
-        // 初始化导演排名图
-        charts.director = echarts.init(document.getElementById('director-chart'));
-        charts.director.setOption(data.director_ranking);
-        
-        // 窗口大小变化时重绘图表
-        window.addEventListener('resize', function() {
-          Object.values(charts).forEach(chart => chart.resize());
-        });
-        
+        if (data.stats) {
+          $('#avg-rating').text(data.stats.avg_rating);
+          $('#earliest-year').text(data.stats.earliest_year);
+          $('#country-count').text(data.stats.country_count);
+        }
+
+        if (!charts.rating) charts.rating = echarts.init(document.getElementById('rating-chart'));
+        charts.rating.setOption(data.rating_distribution, true);
+
+        if (!charts.year) charts.year = echarts.init(document.getElementById('year-chart'));
+        charts.year.setOption(data.year_distribution, true);
+
+        if (!charts.country) charts.country = echarts.init(document.getElementById('country-chart'));
+        charts.country.setOption(data.country_distribution, true);
+
+        if (!charts.genre) charts.genre = echarts.init(document.getElementById('genre-chart'));
+        charts.genre.setOption(data.genre_distribution, true);
+
+        if (!charts.director) charts.director = echarts.init(document.getElementById('director-chart'));
+        charts.director.setOption(data.director_ranking, true);
+
       } catch (error) {
         console.error('加载图表数据失败:', error);
         $('.chart-container').html('<div class="loading">数据加载失败，请刷新页面重试</div>');
       }
     }
 
-    // 刷新单个图表
-    async function refreshChart(chartType) {
+    async function rebuildCache() {
+      $('#globalRefreshBtn').prop('disabled', true).html('<i class="icofont-spinner icofont-spin"></i> 重建中...');
+      $('#refreshStatus').text('');
       try {
-        const response = await fetch(`/api/charts/${chartType}`);
-        const data = await response.json();
-        charts[chartType].setOption(data, true);
-      } catch (error) {
-        console.error(`刷新${chartType}图表失败:`, error);
+        await loadAllCharts(true);
+        $('#refreshStatus').text('✓ 缓存已重建');
+      } catch (e) {
+        $('#refreshStatus').text('✗ 重建失败');
+      }
+      $('#globalRefreshBtn').prop('disabled', false).html('<i class="icofont-refresh"></i> 清除缓存并重建全部图表');
+    }
+
+    function resetZoom(chartType) {
+      if (charts[chartType]) {
+        charts[chartType].dispatchAction({ type: 'dataZoom', start: 0, end: 100 });
       }
     }
 
-    // 重置缩放
-    function resetZoom(chartType) {
-      if (charts[chartType]) {
-        charts[chartType].dispatchAction({
-          type: 'dataZoom',
-          start: 0,
-          end: 100
-        });
-      }
-    }
+    window.addEventListener('resize', function() {
+      Object.values(charts).forEach(function(c) { c.resize(); });
+    });
   </script>
 </body>
 </html>

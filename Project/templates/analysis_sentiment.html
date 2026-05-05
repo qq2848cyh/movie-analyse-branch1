@@ -24,11 +24,16 @@
     #team.team { flex: 1; }
     .sa-chart-box { background: #fff; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.07); padding: 18px; margin-bottom: 24px; }
     .sa-chart-inner { width: 100%; height: 380px; }
+    .sa-chart-inner-short { width: 100%; height: 300px; }
     .sa-metric { text-align: center; padding: 10px 0; }
     .sa-metric-val { font-size: 1.4rem; font-weight: 700; }
     .sa-metric-label { font-size: 0.75rem; color: #999; margin-top: 2px; }
     .sa-rank-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #f0f0f0; }
     .sa-loading { text-align: center; padding: 60px; color: #999; }
+    .sa-attn-word { display: inline-block; padding: 2px 8px; border-radius: 6px; margin: 2px; font-size: 0.9rem; transition: transform 0.15s; cursor: default; }
+    .sa-attn-word:hover { transform: scale(1.1); }
+    .sa-attn-preset { display: inline-block; margin: 3px 4px; padding: 4px 14px; border-radius: 16px; font-size: 0.78rem; cursor: pointer; border: 1px solid #d0d0d0; background: #f9f9f9; transition: all 0.2s; }
+    .sa-attn-preset:hover { background: #667eea; color: #fff; border-color: #667eea; }
   </style>
 </head>
 
@@ -55,7 +60,7 @@
 
       <div class="section-title">
         <h2>评论情感分析</h2>
-        <p>基于机器学习的中文电影评论情感分类 — 多模型对比 + 关键词挖掘 + 时间趋势</p>
+        <p>基于传统机器学习与深度学习的电影评论情感分类对比 — LightGBM vs BiLSTM-Attention</p>
       </div>
 
       <div id="saLoading" class="sa-loading">
@@ -65,8 +70,50 @@
       <div id="saContent" style="display:none;">
 
         <div class="sa-chart-box" data-aos="fade-up">
-          <h5 class="sa-rank-title">多模型分类性能对比</h5>
+          <h5 class="sa-rank-title">二分类性能对比 (LightGBM vs BiLSTM-Attention)</h5>
           <div class="row text-center" id="metricsRow"></div>
+        </div>
+
+        <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">五分类 F1 对比</h5>
+          <div class="sa-chart-inner-short" id="chartF1Compare"></div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="sa-chart-box">
+              <h5 class="sa-rank-title">五分类混淆矩阵 (LightGBM)</h5>
+              <div class="sa-chart-inner" id="chartCM_ML"></div>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="sa-chart-box">
+              <h5 class="sa-rank-title">五分类混淆矩阵 (BiLSTM-Attention)</h5>
+              <div class="sa-chart-inner" id="chartCM_DL"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">注意力机制可视化 <span style="font-size:0.75rem;color:#999;margin-left:10px;">— 输入评论文本，查看模型对各个词的关注程度</span></h5>
+          <div style="margin-bottom:12px;">
+            <input id="attnInput" type="text" placeholder="在此输入电影评论文本..." style="width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;" />
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+              <div>
+                <span style="font-size:0.75rem;color:#999;">预设示例：</span>
+                <span class="sa-attn-preset" onclick="usePreset(0)">👍 正面</span>
+                <span class="sa-attn-preset" onclick="usePreset(1)">👎 负面</span>
+                <span class="sa-attn-preset" onclick="usePreset(2)">🤔 中性</span>
+              </div>
+              <button id="attnBtn" onclick="analyzeAttention()" style="padding:8px 22px;background:#667eea;color:#fff;border:none;border-radius:8px;font-size:0.85rem;cursor:pointer;">分析注意力</button>
+            </div>
+          </div>
+          <div id="attnResult" style="min-height:40px;padding:12px;background:#fafafa;border-radius:8px;display:flex;flex-wrap:wrap;align-items:flex-start;"></div>
+          <div id="attnLegend" style="margin-top:10px;font-size:0.72rem;color:#666;display:flex;gap:18px;justify-content:center;align-items:center;">
+            <span><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#1a56db;vertical-align:middle;margin-right:4px;"></span>高权重（核心情感词）</span>
+            <span><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#dbeafe;border:1px solid #93c5fd;vertical-align:middle;margin-right:4px;"></span>中权重</span>
+            <span><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#f3f4f6;border:1px solid #d1d5db;vertical-align:middle;margin-right:4px;"></span>低权重（背景词）</span>
+          </div>
         </div>
 
         <div class="sa-chart-box" data-aos="fade-up">
@@ -89,8 +136,17 @@
           </div>
         </div>
 
+        <div class="row">
+          <div class="col-lg-12" data-aos="fade-up">
+            <div class="sa-chart-box">
+              <h5 class="sa-rank-title">各评分关键词</h5>
+              <div id="ratingKeywords"></div>
+            </div>
+          </div>
+        </div>
+
         <div class="sa-chart-box" data-aos="fade-up">
-          <h5 class="sa-rank-title">评分趋势（2005-2019）</h5>
+          <h5 class="sa-rank-title">评分趋势（2005-2019）<span id="trendSig" style="font-size:0.75rem;margin-left:10px;"></span></h5>
           <div class="sa-chart-inner" id="chartTrend"></div>
         </div>
 
@@ -117,9 +173,142 @@
   <script>
     var chartRD = null;
     var chartT = null;
+    var chartF1 = null;
+    var chartCM_ML = null;
+    var chartCM_DL = null;
     var pollTimer = null;
+    var dlPollTimer = null;
+    var mlData = null;
+    var dlData = null;
 
-    function loadData() {
+    var presets = [
+      "这部电影真的很棒，剧情紧凑，演技在线，强烈推荐！",
+      "太烂了，剧情莫名其妙，浪费了两个小时的时间",
+      "特效不错，但是剧情太弱，整体一般般吧"
+    ];
+
+    function usePreset(idx) {
+      document.getElementById('attnInput').value = presets[idx];
+      analyzeAttention();
+    }
+
+    function analyzeAttention() {
+      var text = document.getElementById('attnInput').value.trim();
+      var el = document.getElementById('attnResult');
+      if (!text) { el.innerHTML = '<span style="color:#999;">请输入评论内容</span>'; return; }
+
+      el.innerHTML = '<i class="icofont-spinner icofont-spin" style="font-size:18px;"></i> 分析中...';
+
+      fetch('/api/analysis/sentiment/dl/attention?text=' + encodeURIComponent(text))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.error) { el.innerHTML = '<span style="color:#f5576c;">' + d.error + '</span>'; return; }
+          if (!d.words || !d.words.length) { el.innerHTML = '<span style="color:#999;">分词结果为空</span>'; return; }
+
+          var maxW = d.max_weight, minW = d.min_weight;
+          var range = maxW - minW || 1;
+          var html = '';
+          d.words.forEach(function(w, i) {
+            var wgt = d.weights[i];
+            var ratio = (wgt - minW) / range;
+            var bg, clr;
+            if (ratio > 0.6) { bg = '#1a56db'; clr = '#fff'; }
+            else if (ratio > 0.3) { bg = '#dbeafe'; clr = '#1e40af'; }
+            else { bg = '#f3f4f6'; clr = '#6b7280'; }
+            html += '<span class="sa-attn-word" style="background:' + bg + ';color:' + clr + ';">' + w + '<sup style="font-size:0.6rem;margin-left:2px;">' + wgt.toFixed(3) + '</sup></span>';
+          });
+          el.innerHTML = html;
+        })
+        .catch(function() { el.innerHTML = '<span style="color:#f5576c;">请求失败</span>'; });
+    }
+
+    function renderCM(chart, cmData) {
+      var cm = cmData;
+      var maxVal = Math.max.apply(null, cm.map(function(r){return Math.max.apply(null,r)}));
+      var heatData = [];
+      for (var i = 0; i < cm.length; i++) {
+        for (var j = 0; j < cm[i].length; j++) {
+          heatData.push([j, i, cm[i][j] || 0]);
+        }
+      }
+      chart.setOption({
+        tooltip: {},
+        xAxis: { type: 'category', data: ['1分','2分','3分','4分','5分'], position: 'top' },
+        yAxis: { type: 'category', data: ['1分','2分','3分','4分','5分'], inverse: true },
+        visualMap: { min: 0, max: maxVal, inRange: { color: ['#f5f5f5','#a18cd1','#667eea'] }, show: false },
+        series: [{ type: 'heatmap', data: heatData, label: { show: true, fontSize: 10 },
+          itemStyle: { borderColor: '#fff', borderWidth: 1 } }],
+        grid: { left: 50, right: 20, top: 30, bottom: 20 }
+      });
+    }
+
+    function renderF1Compare(mlFive, dlFive) {
+      if (!chartF1) chartF1 = echarts.init(document.getElementById('chartF1Compare'));
+
+      var labels = ['1分', '2分', '3分', '4分', '5分'];
+      var mlF1 = mlFive && mlFive.per_class_f1 ? mlFive.per_class_f1 : [];
+      var dlF1 = dlFive && dlFive.per_class_f1 ? dlFive.per_class_f1 : [];
+
+      var mlAcc = mlFive ? (mlFive.accuracy*100).toFixed(1) : '--';
+      var dlAcc = dlFive ? (dlFive.accuracy*100).toFixed(1) : '--';
+
+      chartF1.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['LightGBM', 'BiLSTM-Attention'] },
+        xAxis: { type: 'category', data: labels },
+        yAxis: { type: 'value', name: 'F1', min: 0, max: 1 },
+        series: [
+          { name: 'LightGBM', type: 'bar', data: mlF1, itemStyle: { color: '#f093fb' }, label: { show: true, formatter: function(p){return p.value.toFixed(2);}, fontSize: 10 } },
+          { name: 'BiLSTM-Attention', type: 'bar', data: dlF1, itemStyle: { color: '#667eea' }, label: { show: true, formatter: function(p){return p.value.toFixed(2);}, fontSize: 10 } }
+        ]
+      });
+    }
+
+    function renderMetrics(mlBinary, dlBinary) {
+      var metrics = ['accuracy', 'precision', 'recall', 'f1'];
+      var names = ['准确率', '精确率', '召回率', 'F1'];
+      var h = '';
+
+      var mlRow = '<div class="col-md-6"><div style="padding:8px 12px;background:#fdf2f8;border-radius:10px;margin:4px;"><b style="color:#c026d3;">LightGBM</b><div class="row" style="margin-top:6px;">';
+      metrics.forEach(function(k, i) {
+        var v = mlBinary && mlBinary[k] !== undefined ? (mlBinary[k]*100).toFixed(1) + '%' : '--';
+        mlRow += '<div class="col-3 sa-metric"><div class="sa-metric-val" style="color:#c026d3;font-size:1.1rem;">' + v + '</div><div class="sa-metric-label">' + names[i] + '</div></div>';
+      });
+      mlRow += '</div></div></div>';
+
+      var dlRow = '<div class="col-md-6"><div style="padding:8px 12px;background:#eef2ff;border-radius:10px;margin:4px;"><b style="color:#4338ca;">BiLSTM-Attention</b><div class="row" style="margin-top:6px;">';
+      metrics.forEach(function(k, i) {
+        var v = dlBinary && dlBinary[k] !== undefined ? (dlBinary[k]*100).toFixed(1) + '%' : '--';
+        dlRow += '<div class="col-3 sa-metric"><div class="sa-metric-val" style="color:#4338ca;font-size:1.1rem;">' + v + '</div><div class="sa-metric-label">' + names[i] + '</div></div>';
+      });
+      dlRow += '</div></div></div>';
+
+      h = mlRow + dlRow;
+      document.getElementById('metricsRow').innerHTML = h;
+    }
+
+    function renderAll() {
+      if (!mlData || mlData.status === 'warming') return;
+
+      var clf = mlData.classification;
+      var mlBinary = clf.test_results.LightGBM;
+      var mlFive = clf.test_results.LightGBM_5cls;
+      var dlBinary = (dlData && dlData.binary) ? dlData.binary : null;
+      var dlFive = (dlData && dlData.five_class) ? dlData.five_class : null;
+
+      renderMetrics(mlBinary, dlBinary);
+      renderF1Compare(mlFive, dlFive);
+
+      if (!chartCM_ML) chartCM_ML = echarts.init(document.getElementById('chartCM_ML'));
+      if (!chartCM_DL) chartCM_DL = echarts.init(document.getElementById('chartCM_DL'));
+
+      if (mlFive && mlFive.confusion_matrix) renderCM(chartCM_ML, mlFive.confusion_matrix);
+      if (dlFive && dlFive.confusion_matrix) renderCM(chartCM_DL, dlFive.confusion_matrix);
+
+      document.getElementById('attnInput').value = presets[0];
+    }
+
+    function loadML() {
       fetch('/api/analysis/sentiment/all')
         .then(function(r) { return r.json(); })
         .then(function(d) {
@@ -128,78 +317,113 @@
               document.getElementById('saLoading').innerHTML =
                 '<i class="icofont-spinner icofont-spin" style="font-size:36px;display:block;margin-bottom:10px;"></i>' +
                 d.message + '（首次约需 40-60 秒）...';
-              pollTimer = setInterval(loadData, 4000);
+              pollTimer = setInterval(loadML, 4000);
             }
             return;
           }
-
           if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+          mlData = d;
           document.getElementById('saLoading').style.display = 'none';
           document.getElementById('saContent').style.display = 'block';
 
           if (!chartRD) chartRD = echarts.init(document.getElementById('chartRatingDist'));
           if (!chartT) chartT = echarts.init(document.getElementById('chartTrend'));
 
-        var clf = d.classification;
-        var colors = { NaiveBayes: '#4facfe', LogisticRegression: '#43e97b', LightGBM: '#f093fb' };
-        var h = '';
-        Object.keys(clf.metrics).forEach(function(k) {
-          var m = clf.metrics[k];
-          h += '<div class="col-md-4 sa-metric"><div class="sa-metric-val" style="color:' + (colors[k]||'#333') + '">' +
-            (m.accuracy*100).toFixed(1) + '%</div><div class="sa-metric-label">' + k + ' (CV: ' + (m.cv_mean*100).toFixed(1) + '%)</div></div>';
-        });
-        document.getElementById('metricsRow').innerHTML = h;
+          var clf = d.classification;
 
-        var rd = d.rating_distribution;
-        chartRD.setOption({
-          tooltip: {},
-          xAxis: { data: rd.labels, name: '评分' },
-          yAxis: { name: '评论数' },
-          series: [{ type: 'bar', data: rd.counts,
-            itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
-              [{offset:0,color:'#f093fb'},{offset:1,color:'#f5576c'}]) } }]
-        });
-
-        var kw = clf.key_words;
-        function renderWords(el, words, gradient) {
-          var h = '';
-          words.slice(0, 25).forEach(function(w, i) {
-            var size = 0.75 + (words.length - i) / words.length * 0.5;
-            h += '<span style="display:inline-block;padding:3px 10px;border-radius:14px;font-size:' +
-              size.toFixed(2) + 'rem;font-weight:500;background:' + gradient + ';color:#fff;margin:3px;">' + w.word + '</span>';
+          var rd = d.rating_distribution;
+          chartRD.setOption({
+            tooltip: {},
+            xAxis: { data: rd.labels, name: '评分' },
+            yAxis: { name: '评论数' },
+            series: [{ type: 'bar', data: rd.counts,
+              itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+                [{offset:0,color:'#f093fb'},{offset:1,color:'#f5576c'}]) } }]
           });
-          document.getElementById(el).innerHTML = h;
-        }
-        renderWords('posWords', kw.positive, 'linear-gradient(135deg, #43e97b, #38f9d7)');
-        renderWords('negWords', kw.negative, 'linear-gradient(135deg, #f093fb, #f5576c)');
 
-        var trend = d.trend;
-        chartT.setOption({
-          tooltip: { trigger: 'axis' },
-          legend: { data: ['平均评分', '正面比例(%)'] },
-          xAxis: { data: trend.map(function(t) { return t.year; }) },
-          yAxis: [
-            { type: 'value', name: '评分', min: 3, max: 5 },
-            { type: 'value', name: '正面比例(%)', min: 30, max: 90 }
-          ],
-          series: [
-            { name: '平均评分', type: 'line', data: trend.map(function(t) { return t.avg_rating; }), itemStyle: { color: '#f5576c' }, smooth: true },
-            { name: '正面比例(%)', type: 'line', yAxisIndex: 1, data: trend.map(function(t) { return t.positive_ratio; }), itemStyle: { color: '#4facfe' }, smooth: true }
-          ]
+          var kw = clf.key_words;
+          function renderWords(el, words, gradient) {
+            var h = '';
+            words.slice(0, 25).forEach(function(w, i) {
+              var size = 0.75 + (words.length - i) / words.length * 0.5;
+              h += '<span style="display:inline-block;padding:3px 10px;border-radius:14px;font-size:' +
+                size.toFixed(2) + 'rem;font-weight:500;background:' + gradient + ';color:#fff;margin:3px;">' + w.word + '</span>';
+            });
+            document.getElementById(el).innerHTML = h;
+          }
+          renderWords('posWords', kw.positive, 'linear-gradient(135deg, #43e97b, #38f9d7)');
+          renderWords('negWords', kw.negative, 'linear-gradient(135deg, #f093fb, #f5576c)');
+
+          var rk = clf.rating_keywords;
+          if (rk) {
+            var rkHtml = '';
+            [1,2,3,4,5].forEach(function(r) {
+              var key = 'rating_' + r;
+              if (rk[key]) {
+                var words = rk[key].slice(0, 6).map(function(w){return w.word}).join(' / ');
+                rkHtml += '<p style="margin:4px 0;font-size:0.82rem;"><b>' + r + '分：</b>' + words + '</p>';
+              }
+            });
+            document.getElementById('ratingKeywords').innerHTML = rkHtml || '<p style="color:#999;">暂无</p>';
+          }
+
+          var trend = d.trend;
+          if (trend.significant !== undefined) {
+            document.getElementById('trendSig').textContent =
+              trend.significant ? '(Mann-Whitney U: p=' + trend.p_value + ', 前后半段差异显著)' :
+              '(Mann-Whitney U: p=' + trend.p_value + ', 无显著差异)';
+          }
+          chartT.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['平均评分', '正面比例(%)'] },
+            xAxis: { data: trend.points.map(function(t) { return t.year; }) },
+            yAxis: [
+              { type: 'value', name: '评分', min: 3, max: 5 },
+              { type: 'value', name: '正面比例(%)', min: 30, max: 90 }
+            ],
+            series: [
+              { name: '平均评分', type: 'line', data: trend.points.map(function(t) { return t.avg_rating; }), itemStyle: { color: '#f5576c' }, smooth: true },
+              { name: '正面比例(%)', type: 'line', yAxisIndex: 1, data: trend.points.map(function(t) { return t.positive_ratio; }), itemStyle: { color: '#4facfe' }, smooth: true }
+            ]
+          });
+
+          chartRD.resize();
+          chartT.resize();
+          renderAll();
+          AOS.init();
+        })
+        .catch(function() {
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          document.getElementById('saLoading').innerHTML = '<p style="color:#f5576c;">加载失败</p>';
         });
-
-        chartRD.resize();
-        chartT.resize();
-        AOS.init();
-      }).catch(function() {
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-        document.getElementById('saLoading').innerHTML = '<p style="color:#f5576c;">加载失败</p>';
-      });
     }
 
-    loadData();
+    function loadDL() {
+      fetch('/api/analysis/sentiment/dl')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.status === 'warming') {
+            if (!dlPollTimer) dlPollTimer = setInterval(loadDL, 5000);
+            return;
+          }
+          if (dlPollTimer) { clearInterval(dlPollTimer); dlPollTimer = null; }
+          dlData = d;
+          if (mlData) renderAll();
+        })
+        .catch(function() {});
+    }
 
-    window.addEventListener('resize', function() { if (chartRD) chartRD.resize(); if (chartT) chartT.resize(); });
+    loadML();
+    loadDL();
+
+    window.addEventListener('resize', function() {
+      if (chartRD) chartRD.resize();
+      if (chartT) chartT.resize();
+      if (chartF1) chartF1.resize();
+      if (chartCM_ML) chartCM_ML.resize();
+      if (chartCM_DL) chartCM_DL.resize();
+    });
   </script>
 
 </body>

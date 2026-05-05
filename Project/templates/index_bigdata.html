@@ -21,6 +21,35 @@
   <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    #footer { margin-top: auto; }
+    .feature-module {
+      padding: 40px 30px !important;
+      transition: all 0.35s cubic-bezier(0.25,0.8,0.25,1.2);
+      cursor: pointer;
+    }
+    .feature-module:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.15) !important;
+    }
+    .feature-module i {
+      font-size: 72px !important;
+      display: block;
+      margin-bottom: 20px;
+      transition: transform 0.3s ease;
+    }
+    .feature-module:hover i {
+      transform: scale(1.1);
+    }
+    .feature-module p {
+      font-size: 20px !important;
+      font-weight: 700 !important;
+      color: #1c5c93 !important;
+      margin: 0;
+    }
+  </style>
+
 </head>
 
 <body>
@@ -49,45 +78,42 @@
         <p>基于海量电影数据集，应用Python爬虫、Flask框架、ECharts交互式可视化与词云分析等技术实现</p>
       </div>
 
+      <!-- ======= Feature Modules Section ======= -->
       <section class="counts section-bg">
         <div class="container">
           <div class="row">
 
             <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up">
               <a href="/bigdata/movie">
-                <div class="count-box">
-                  <i class="icofont-simple-smile" style="color: #20b38e;"></i>
-                  <span data-toggle="counter-up">140000</span>
-                  <p>海量电影</p>
+                <div class="count-box feature-module">
+                  <i class="icofont-film" style="color: #20b38e; font-size: 72px;"></i>
+                  <p>电影列表</p>
                 </div>
               </a>
             </div>
 
             <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="200">
               <a href="/bigdata/score">
-                <div class="count-box">
-                  <i class="icofont-document-folder" style="color: #c042ff;"></i>
-                  <span data-toggle="counter-up">5</span>
-                  <p>分析维度</p>
+                <div class="count-box feature-module">
+                  <i class="icofont-chart-bar-graph" style="color: #c042ff; font-size: 72px;"></i>
+                  <p>数据分析</p>
                 </div>
               </a>
             </div>
 
             <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="400">
               <a href="/bigdata/word">
-                <div class="count-box">
-                  <i class="icofont-live-support" style="color: #46d1ff;"></i>
-                  <span data-toggle="counter-up">4420000</span>
-                  <p>用户评论</p>
+                <div class="count-box feature-module">
+                  <i class="icofont-cloud" style="color: #46d1ff; font-size: 72px;"></i>
+                  <p>词云分析</p>
                 </div>
               </a>
             </div>
 
             <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="600">
               <a href="/aboutMe">
-                <div class="count-box">
-                  <i class="icofont-users-alt-5" style="color: #ffb459;"></i>
-                  <span data-toggle="counter-up">1</span>
+                <div class="count-box feature-module">
+                  <i class="icofont-users-alt-5" style="color: #ffb459; font-size: 72px;"></i>
                   <p>关于我</p>
                 </div>
               </a>
@@ -95,7 +121,7 @@
 
           </div>
         </div>
-      </section>
+      </section><!-- End Feature Modules Section -->
 
     </div>
   </section>

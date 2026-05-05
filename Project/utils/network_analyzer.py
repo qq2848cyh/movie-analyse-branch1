@@ -7,8 +7,6 @@ from collections import Counter, defaultdict
 
 
 class NetworkAnalyzer:
-    """演员-导演协作网络分析器"""
-
     def __init__(self, db_manager):
         self.db = db_manager
         self.graph: Optional[nx.Graph] = None
@@ -48,7 +46,7 @@ class NetworkAnalyzer:
             if len(actors) < 2:
                 continue
             if len(actors) > 10:
-                 actors = actors[:10]
+                actors = actors[:10]
             for pid, name in actors:
                 node_names[pid] = name
             for (u, uname), (v, vname) in combinations(actors, 2):
@@ -106,6 +104,7 @@ class NetworkAnalyzer:
         avg_clustering = nx.average_clustering(G, nodes=random.sample(
             list(G.nodes()), min(800, n)
         ))
+        assortativity = nx.degree_assortativity_coefficient(G)
 
         components = list(nx.connected_components(G))
         num_components = len(components)
@@ -141,6 +140,7 @@ class NetworkAnalyzer:
             "avg_path": round(avg_path, 4),
             "diameter": diameter,
             "clustering": round(avg_clustering, 4),
+            "assortativity": round(assortativity, 4),
             "random_path": round(r_path, 4),
             "random_clustering": round(r_clustering, 6),
             "is_small_world": bool(avg_clustering > r_clustering * 5 and avg_path < r_path * 2
@@ -149,26 +149,89 @@ class NetworkAnalyzer:
             "largest_component": l_n,
         }
 
-    def get_degree_distribution(self) -> List[Dict]:
-        """度分布"""
+    def get_degree_distribution(self) -> Dict:
         degrees = [d for _, d in self.graph.degree()]
         counter = Counter(degrees)
         dist = sorted(counter.items())
+        ks = np.array([d[0] for d in dist if d[0] > 0], dtype=float)
+        counts = np.array([d[1] for d in dist if d[0] > 0], dtype=float)
 
-        log_x = np.log([d[0] for d in dist if d[0] > 0])
-        log_y = np.log([d[1] for d in dist if d[0] > 0])
+        log_x = np.log(ks)
+        log_y = np.log(counts)
         slope, intercept = np.polyfit(log_x, log_y, 1)
+
+        from scipy import stats as scipy_stats
+
+        x_min_candidates = ks[ks <= np.percentile(ks, 50)]
+        if len(x_min_candidates) > 2:
+            best_D = float('inf')
+            best_xmin = ks[0]
+            best_alpha = -slope
+            for xm in sorted(set(int(k) for k in x_min_candidates if k >= 1)):
+                tail = ks[ks >= xm]
+                if len(tail) < 10:
+                    continue
+                alpha_mle = 1 + len(tail) / np.sum(np.log(tail / xm))
+                log_norm_cdf = lambda x: scipy_stats.lognorm.cdf(x, s=1, scale=np.exp(np.mean(np.log(tail))))
+                D_ks = np.max(np.abs(
+                    np.arange(1, len(tail)+1) / len(tail) -
+                    (1 - (tail / xm) ** (-(alpha_mle - 1)))
+                ))
+                if D_ks < best_D:
+                    best_D = D_ks
+                    best_xmin = xm
+                    best_alpha = alpha_mle
+        else:
+            best_xmin = int(ks[0])
+            best_alpha = -slope
+
+        ks_test, p_value = scipy_stats.kstest(
+            degrees,
+            "powerlaw",
+            args=(best_alpha - 1,),
+        )
+
+        try:
+            from scipy.stats import powerlaw as pl_dist
+            ks_test_mle, p_value_mle = 0.0, 0.0
+        except Exception:
+            p_value_mle = 0.0
 
         return {
             "distribution": [
-                {"degree": k, "count": v} for k, v in dist if k > 0
+                {"degree": int(k), "count": int(v)} for k, v in dist if k > 0
             ],
             "powerlaw_exponent": round(-slope, 4),
-            "powerlaw_fit": f"P(k) ∝ k^(-{-slope:.2f})",
+            "powerlaw_fit": f"P(k) \u221D k^(-{-slope:.2f})",
+            "powerlaw_mle_alpha": round(best_alpha, 4),
+            "powerlaw_xmin": int(best_xmin),
+            "powerlaw_ks_statistic": round(float(best_D) if 'best_D' in dir() else 0, 4),
+            "powerlaw_coverage": f"k >= {best_xmin} ({len(ks[ks >= best_xmin])} nodes)",
+        }
+
+    def get_kcore_decomposition(self) -> Dict:
+        G = self.graph
+        core_number = nx.core_number(G)
+        max_k = max(core_number.values())
+
+        kcore_dist = Counter(core_number.values())
+        core_dist = sorted(kcore_dist.items())
+
+        top_shell = max_k
+        top_k_nodes = [n for n, c in core_number.items() if c == top_shell]
+        top_k_names = [
+            {"id": int(n), "name": G.nodes[n].get("name", str(n))}
+            for n in top_k_nodes[:20]
+        ]
+
+        return {
+            "max_kcore": max_k,
+            "distribution": [{"k": k, "count": cnt} for k, cnt in core_dist],
+            "top_shell_nodes": top_k_names,
+            "top_shell_size": len(top_k_nodes),
         }
 
     def get_centrality(self, top_n: int = 20) -> Dict:
-        """中心性排名"""
         G = self.graph
         largest_cc = G.subgraph(max(nx.connected_components(G), key=len))
 
@@ -181,29 +244,75 @@ class NetworkAnalyzer:
         return {
             "degree": [
                 {
-                    "id": pid,
+                    "id": int(pid),
                     "name": G.nodes[pid].get("name", str(pid)),
-                    "value": round(v, 6),
+                    "value": round(float(v), 6),
                 }
                 for pid, v in deg_rank
             ],
             "betweenness": [
                 {
-                    "id": pid,
+                    "id": int(pid),
                     "name": G.nodes[pid].get("name", str(pid)),
-                    "value": round(v, 6),
+                    "value": round(float(v), 6),
                 }
                 for pid, v in bet_rank
             ],
         }
 
+    def get_centrality_scatter(self) -> Dict:
+        G = self.graph
+        largest_cc = G.subgraph(max(nx.connected_components(G), key=len))
+        import random
+
+        deg_cent = nx.degree_centrality(G)
+        bet_cent = nx.betweenness_centrality(largest_cc, k=min(200, len(largest_cc)))
+
+        all_deg = list(deg_cent.values())
+        all_bet = list(bet_cent.values())
+
+        deg_median = float(np.median(all_deg)) if all_deg else 0.0
+        bet_median = float(np.median(all_bet)) if all_bet else 0.0
+
+        nodes = list(G.nodes())
+        sample_n = min(1200, len(nodes))
+        if len(nodes) > sample_n:
+            nodes = random.sample(nodes, sample_n)
+
+        scatter_data = []
+        for n in nodes:
+            d_val = deg_cent.get(n, 0)
+            b_val = bet_cent.get(n, 0) if n in largest_cc else 0
+            scatter_data.append({
+                "id": int(n),
+                "name": G.nodes[n].get("name", str(n)),
+                "degree": round(float(d_val), 6),
+                "betweenness": round(float(b_val), 6),
+            })
+
+        return {
+            "scatter": scatter_data,
+            "degree_median": round(deg_median, 6),
+            "betweenness_median": round(bet_median, 6),
+            "sample_size": len(scatter_data),
+            "total_nodes": len(nodes),
+        }
+
     def get_communities(self) -> Dict:
-        """社区检测"""
         G = self.graph
         largest_cc = G.subgraph(max(nx.connected_components(G), key=len))
 
         partition = community_louvain.best_partition(largest_cc)
         community_sizes = Counter(partition.values())
+
+        community_labels = {}
+        community_members = {}
+        for cid in community_sizes:
+            members = [n for n, c in partition.items() if c == cid]
+            member_names = [largest_cc.nodes[n].get("name", str(n)) for n in members]
+            community_members[int(cid)] = member_names
+            label = member_names[0] if member_names else f"社区{cid}"
+            community_labels[cid] = label
 
         node_community = {}
         for node, cid in partition.items():
@@ -212,10 +321,12 @@ class NetworkAnalyzer:
         return {
             "num_communities": len(community_sizes),
             "community_sizes": sorted(
-                [{"id": k, "size": v} for k, v in community_sizes.items()],
+                [{"id": int(k), "size": int(v), "label": community_labels.get(k, f"社区{k}"),
+                  "members": community_members.get(int(k), [])}
+                 for k, v in community_sizes.items()],
                 key=lambda x: x["size"],
                 reverse=True,
-            )[:10],
+            ),
             "modularity": round(
                 community_louvain.modularity(partition, largest_cc), 4
             ),
@@ -223,7 +334,6 @@ class NetworkAnalyzer:
         }
 
     def get_force_graph_data(self, max_nodes: int = 200) -> Dict:
-        """力导向图数据"""
         G = self.graph
         largest_cc = G.subgraph(max(nx.connected_components(G), key=len))
 
@@ -232,9 +342,6 @@ class NetworkAnalyzer:
         sub = largest_cc.subgraph(top_nodes)
 
         partition = community_louvain.best_partition(sub)
-        communities = {}
-        for node, cid in partition.items():
-            communities.setdefault(cid, []).append(node)
 
         nodes = []
         for node in sub.nodes():
@@ -243,8 +350,8 @@ class NetworkAnalyzer:
             nodes.append({
                 "id": int(node),
                 "name": sub.nodes[node].get("name", str(node)),
-                "symbolSize": round(size, 1),
-                "category": int(partition[node]),
+                "symbolSize": round(float(size), 1),
+                "category": int(partition.get(node, 0)),
             })
 
         links = []
@@ -258,12 +365,11 @@ class NetworkAnalyzer:
             "nodes": nodes,
             "links": links,
             "categories": [
-                {"name": f"社区 {i}"} for i in range(len(communities))
+                {"name": f"社区 {i}"} for i in range(len(set(partition.values())))
             ],
         }
 
     def get_all_stats(self) -> Dict:
-        """汇总所有分析结果"""
         if self.graph is None:
             self.build()
 
@@ -276,7 +382,56 @@ class NetworkAnalyzer:
             },
             "global_stats": self.get_global_stats(),
             "degree_distribution": self.get_degree_distribution(),
+            "kcore_decomposition": self.get_kcore_decomposition(),
             "centrality": self.get_centrality(),
+            "centrality_scatter": self.get_centrality_scatter(),
             "communities": self.get_communities(),
             "force_graph": self.get_force_graph_data(),
+        }
+
+    def export_results(self) -> Dict:
+        stats = self.get_all_stats()
+        g = stats["global_stats"]
+        dd = stats["degree_distribution"]
+        kc = stats["kcore_decomposition"]
+        cm = stats["communities"]
+        ct = stats["centrality"]
+
+        return {
+            "network_analysis": {
+                "global_metrics": {
+                    "节点数": g["nodes"],
+                    "边数": g["edges"],
+                    "网络密度": g["density"],
+                    "平均度": g["avg_degree"],
+                    "平均路径长度": g["avg_path"],
+                    "直径": g["diameter"],
+                    "集聚系数": g["clustering"],
+                    "同配系数": g["assortativity"],
+                    "连通分量数": g["components"],
+                    "最大连通分量": g["largest_component"],
+                    "小世界特性成立": "是" if g["is_small_world"] else "否",
+                },
+                "degree_distribution": {
+                    "幂律指数_OLS": dd["powerlaw_exponent"],
+                    "幂律指数_MLE": dd["powerlaw_mle_alpha"],
+                    "幂律下界_xmin": dd["powerlaw_xmin"],
+                    "覆盖范围": dd["powerlaw_coverage"],
+                    "拟合公式": dd["powerlaw_fit"],
+                },
+                "kcore_decomposition": {
+                    "最大k核值": kc["max_kcore"],
+                    "最内核节点数": kc["top_shell_size"],
+                    "最内核代表节点": [n["name"] for n in kc["top_shell_nodes"][:5]],
+                },
+                "community_detection": {
+                    "社区数": cm["num_communities"],
+                    "模块度": cm["modularity"],
+                    "最大社区": cm["community_sizes"][0] if cm["community_sizes"] else None,
+                },
+                "centrality_top5": {
+                    "度中心性": [{"name": x["name"], "value": x["value"]} for x in ct["degree"][:5]],
+                    "介数中心性": [{"name": x["name"], "value": x["value"]} for x in ct["betweenness"][:5]],
+                },
+            }
         }

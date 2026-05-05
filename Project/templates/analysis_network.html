@@ -61,8 +61,55 @@
     .na-loading { text-align: center; padding: 60px; color: #999; }
     .na-loading i { font-size: 36px; display: block; margin-bottom: 10px; }
 
+    .na-chart-inner-wide { width: 100%; height: 620px; }
+    .na-chart-half { width: 100%; height: 380px; }
+    .na-quadrant-legend {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 10px; font-size: 0.82rem; color: #555;
+    }
+    .na-quadrant-legend span { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; padding: 2px 6px; border-radius: 4px; transition: background 0.2s; }
+    .na-quadrant-legend span:hover { background: #f5f5f5; }
+    .na-quadrant-dot {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+    .cm-popup-overlay {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; background: rgba(0,0,0,0.45);
+      z-index: 9999; align-items: center; justify-content: center;
+    }
+    .cm-popup-box {
+      background: #fff; border-radius: 14px;
+      width: 90%; max-width: 700px; max-height: 80vh;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      display: flex; flex-direction: column;
+    }
+    .cm-popup-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+    }
+    .cm-popup-header h5 { margin: 0; font-size: 1rem; font-weight: 700; }
+    .cm-popup-close {
+      background: none; border: none; font-size: 22px;
+      color: #999; cursor: pointer; line-height: 1;
+    }
+    .cm-popup-close:hover { color: #f5576c; }
+    .cm-popup-body {
+      padding: 16px 20px; overflow-y: auto; flex: 1;
+      max-height: 50vh;
+    }
+    .cm-popup-footer {
+      padding: 12px 20px; border-top: 1px solid #f0f0f0;
+      text-align: center;
+    }
+    .cm-popup-footer button {
+      background: #a18cd1; color: #fff; border: none;
+      border-radius: 6px; padding: 6px 18px; font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .cm-popup-footer button:hover { background: #8b74c2; }
     @media (max-width: 768px) {
       .na-chart-inner { height: 320px; }
+      .na-chart-inner-wide { height: 480px; }
     }
   </style>
 </head>
@@ -99,23 +146,57 @@
 
       <div id="naContent" style="display:none;">
 
-        <div class="row mb-4" data-aos="fade-up">
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f5576c"><div class="na-stat-icon">🔗</div><div class="na-stat-val" id="sNodes">-</div><div class="na-stat-label">演员节点</div></div></div>
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #4facfe"><div class="na-stat-icon">🕸️</div><div class="na-stat-val" id="sEdges">-</div><div class="na-stat-label">协作边</div></div></div>
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #43e97b"><div class="na-stat-icon">📐</div><div class="na-stat-val" id="sDegree">-</div><div class="na-stat-label">平均度</div></div></div>
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #a18cd1"><div class="na-stat-icon">🌐</div><div class="na-stat-val" id="sPath">-</div><div class="na-stat-label">平均路径</div></div></div>
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f093fb"><div class="na-stat-icon">△</div><div class="na-stat-val" id="sCluster">-</div><div class="na-stat-label">集聚系数</div></div></div>
-          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #fcb69f"><div class="na-stat-icon">🧩</div><div class="na-stat-val" id="sCommunities">-</div><div class="na-stat-label">社区数量</div></div></div>
+        <div class="na-chart-box" data-aos="fade-up">
+          <h5 class="na-rank-title">📊 网络总览</h5>
+          <div class="row mb-2">
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f5576c"><div class="na-stat-icon">🔗</div><div class="na-stat-val" id="sNodes">-</div><div class="na-stat-label">演员节点</div></div></div>
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #4facfe"><div class="na-stat-icon">🕸️</div><div class="na-stat-val" id="sEdges">-</div><div class="na-stat-label">协作边</div></div></div>
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #43e97b"><div class="na-stat-icon">📐</div><div class="na-stat-val" id="sDegree">-</div><div class="na-stat-label">平均度</div></div></div>
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #a18cd1"><div class="na-stat-icon">🌐</div><div class="na-stat-val" id="sPath">-</div><div class="na-stat-label">平均路径</div></div></div>
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f093fb"><div class="na-stat-icon">△</div><div class="na-stat-val" id="sCluster">-</div><div class="na-stat-label">集聚系数</div></div></div>
+            <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #fcb69f"><div class="na-stat-icon">🧩</div><div class="na-stat-val" id="sCommunities">-</div><div class="na-stat-label">社区数量</div></div></div>
+          </div>
+          <hr style="margin:16px 0;">
+          <div class="row text-center">
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.82rem;">实际网络集聚系数</p>
+              <p style="font-size:1.6rem; font-weight:700; color:#f5576c; margin:0;" id="swCluster">-</p>
+            </div>
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.82rem;">随机网络集聚系数</p>
+              <p style="font-size:1.6rem; font-weight:700; color:#3498db; margin:0;" id="swRandCluster">-</p>
+            </div>
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.82rem;">小世界特性判定</p>
+              <p style="font-size:1.3rem; font-weight:700; color:#43e97b; margin:0;" id="swVerdict">-</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="na-chart-box">
+              <h5 class="na-rank-title">📈 度分布（双对数坐标）</h5>
+              <div class="na-chart-inner" id="chartDegree"></div>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="na-chart-box">
+              <h5 class="na-rank-title">🍩 k-Core 分解分布</h5>
+              <div class="na-chart-inner" id="chartKCore"></div>
+            </div>
+          </div>
         </div>
 
         <div class="na-chart-box" data-aos="fade-up">
-          <h5 class="na-rank-title">📈 度分布（双对数坐标）</h5>
-          <div class="na-chart-inner" id="chartDegree"></div>
-        </div>
-
-        <div class="na-chart-box" data-aos="fade-up">
-          <h5 class="na-rank-title">🔗 协作网络力导向图</h5>
-          <div class="na-chart-inner" id="chartForce"></div>
+          <h5 class="na-rank-title">🎯 度-介数中心性四象限分析</h5>
+          <div class="na-chart-inner-wide" id="chartScatter"></div>
+          <div class="na-quadrant-legend" id="quadrantLegend">
+            <span data-quad="I"><i class="na-quadrant-dot" style="background:#f5576c;"></i> I·超级枢纽（高度+高介数）</span>
+            <span data-quad="II"><i class="na-quadrant-dot" style="background:#4facfe;"></i> II·隐藏桥梁（低度+高介数）</span>
+            <span data-quad="III"><i class="na-quadrant-dot" style="background:#f0a040;"></i> III·边缘节点（低度+低介数）</span>
+            <span data-quad="IV"><i class="na-quadrant-dot" style="background:#43e97b;"></i> IV·局部明星（高度+低介数）</span>
+          </div>
         </div>
 
         <div class="row">
@@ -134,27 +215,30 @@
         </div>
 
         <div class="na-chart-box" data-aos="fade-up">
-          <h5 class="na-rank-title">🔬 小世界特性验证</h5>
-          <div class="row text-center">
-            <div class="col-md-4">
-              <p style="color:#999; font-size:0.85rem;">实际网络集聚系数</p>
-              <p style="font-size:1.8rem; font-weight:700; color:#f5576c;" id="swCluster">-</p>
-            </div>
-            <div class="col-md-4">
-              <p style="color:#999; font-size:0.85rem;">随机网络集聚系数</p>
-              <p style="font-size:1.8rem; font-weight:700; color:#3498db;" id="swRandCluster">-</p>
-            </div>
-            <div class="col-md-4">
-              <p style="color:#999; font-size:0.85rem;">判定结论</p>
-              <p style="font-size:1.4rem; font-weight:700; color:#43e97b;" id="swVerdict">-</p>
-            </div>
-          </div>
+          <h5 class="na-rank-title">🔗 协作网络力导向图（前200核心节点，按社区着色）</h5>
+          <div class="na-chart-inner" id="chartForce"></div>
+        </div>
+
+        <div class="na-chart-box" data-aos="fade-up">
+          <h5 class="na-rank-title">🏘️ 社区规模分布</h5>
+          <div class="na-chart-inner" id="chartCommunitySize"></div>
         </div>
 
       </div>
 
     </div>
   </section>
+
+  <div class="cm-popup-overlay" id="cmPopupOverlay" onclick="if(event.target===this)closeCommunityPopup();">
+    <div class="cm-popup-box">
+      <div class="cm-popup-header">
+        <h5 id="cmPopupTitle"></h5>
+        <button class="cm-popup-close" onclick="closeCommunityPopup();">&times;</button>
+      </div>
+      <div class="cm-popup-body" id="cmPopupBody"></div>
+      <div class="cm-popup-footer" id="cmPopupFooter"></div>
+    </div>
+  </div>
 
   <footer id="footer">
     <div class="container">
@@ -180,7 +264,60 @@
   <script>
     var chartDegree = null;
     var chartForce = null;
+    var chartScatter = null;
     var pollTimer = null;
+
+    var communityMembersMap = {};
+    var cmLabelMap = {};
+    var cmSizesGlobal = [];
+    var popupPage = {};
+    var popupCommunityId = null;
+    var POPUP_PAGE_SIZE = 30;
+
+    function showCommunityPopup(cid) {
+      popupCommunityId = cid;
+      popupPage[cid] = 0;
+      var members = communityMembersMap[cid] || [];
+      if (members.length === 0) return;
+      document.getElementById('cmPopupTitle').textContent = cmLabelMap[cid] + ' — 共 ' + members.length + ' 人';
+      document.getElementById('cmPopupOverlay').style.display = 'flex';
+      renderPopupPage();
+    }
+
+    function closeCommunityPopup() {
+      document.getElementById('cmPopupOverlay').style.display = 'none';
+      popupCommunityId = null;
+    }
+
+    function renderPopupPage() {
+      var cid = popupCommunityId;
+      if (cid === null) return;
+      var members = communityMembersMap[cid] || [];
+      var pg = popupPage[cid] || 0;
+      var totalPages = Math.ceil(members.length / POPUP_PAGE_SIZE);
+      var start = pg * POPUP_PAGE_SIZE;
+      var pageItems = members.slice(start, start + POPUP_PAGE_SIZE);
+      var h = '<div style="display:flex;flex-wrap:wrap;gap:4px 8px;">';
+      pageItems.forEach(function(name, i) {
+        h += '<span style="font-size:0.82rem;color:#333;background:#f5f3ff;padding:2px 8px;border-radius:4px;">' + (start+i+1) + '. ' + name + '</span>';
+      });
+      h += '</div>';
+      document.getElementById('cmPopupBody').innerHTML = h;
+
+      var footer = document.getElementById('cmPopupFooter');
+      var ft = '';
+      if (totalPages > 1) {
+        ft += '<button onclick="popupPage[popupCommunityId]=Math.max(0,popupPage[popupCommunityId]-1);renderPopupPage();" ' +
+          (pg === 0 ? 'disabled style="opacity:0.4"' : '') + '>上一页</button>';
+        ft += '<span style="margin:0 10px;font-size:0.82rem;">' + (pg+1) + ' / ' + totalPages + '</span>';
+        ft += '<button onclick="popupPage[popupCommunityId]=Math.min(' + (totalPages-1) + ',popupPage[popupCommunityId]+1);renderPopupPage();" ' +
+          (pg >= totalPages - 1 ? 'disabled style="opacity:0.4"' : '') + '>下一页</button>';
+        ft += '<span style="margin-left:16px;font-size:0.82rem;">跳至</span>';
+        ft += '<input id="cmPageJumpInput" type="number" min="1" max="' + totalPages + '" value="' + (pg+1) + '" style="width:50px;text-align:center;margin:0 4px;border:1px solid #ddd;border-radius:4px;">';
+        ft += '<button onclick="var v=parseInt(document.getElementById(\'cmPageJumpInput\').value);if(v>=1&&v<=' + totalPages + '){popupPage[popupCommunityId]=v-1;renderPopupPage();}">跳转</button>';
+      }
+      footer.innerHTML = ft;
+    }
 
     function loadData() {
       fetch('/api/analysis/network/stats')
@@ -202,6 +339,7 @@
 
           if (!chartDegree) chartDegree = echarts.init(document.getElementById('chartDegree'));
           if (!chartForce) chartForce = echarts.init(document.getElementById('chartForce'));
+          if (!chartScatter) chartScatter = echarts.init(document.getElementById('chartScatter'));
 
         var g = d.global_stats;
         document.getElementById('sNodes').textContent = g.nodes.toLocaleString();
@@ -219,6 +357,7 @@
         var dist = d.degree_distribution.distribution;
         chartDegree.setOption({
           tooltip: { trigger: 'axis' },
+          toolbox: { feature: { dataZoom: { yAxisIndex: 'none' }, restore: {} }, right: 15, top: 5 },
           grid: { top: 50, right: 35, bottom: 70, left: 70 },
           title: {
             text: d.degree_distribution.powerlaw_fit,
@@ -285,8 +424,166 @@
         renderRank('rankDegree', d.centrality.degree);
         renderRank('rankBetweenness', d.centrality.betweenness);
 
+        var chartKCore = echarts.init(document.getElementById('chartKCore'));
+        chartKCore.setOption({
+          tooltip: { trigger: 'axis' },
+          toolbox: { feature: { dataZoom: { yAxisIndex: 'none' }, restore: {} }, right: 15, top: 5 },
+          xAxis: { type: 'category', data: d.kcore_decomposition.distribution.map(function(x){return 'k='+x.k}) },
+          yAxis: { type: 'log', name: '节点数' },
+          series: [{ type: 'bar', data: d.kcore_decomposition.distribution.map(function(x){return x.count}),
+            itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+              [{offset:0,color:'#a18cd1'},{offset:1,color:'#fbc2eb'}]) } }],
+          grid: { left: 55, right: 15, top: 15, bottom: 40 }
+        });
+
+        var cs = d.centrality_scatter;
+        var scData = cs.scatter;
+        var dm = cs.degree_median;
+        var bm = cs.betweenness_median;
+
+        var qColors = { I: '#f5576c', II: '#4facfe', III: '#f0a040', IV: '#43e97b' };
+        var seriesByQuad = { I: [], II: [], III: [], IV: [] };
+
+        scData.forEach(function(p) {
+          var q;
+          if (p.degree >= dm && p.betweenness >= bm) q = 'I';
+          else if (p.degree < dm && p.betweenness >= bm) q = 'II';
+          else if (p.degree < dm && p.betweenness < bm) q = 'III';
+          else q = 'IV';
+          seriesByQuad[q].push([p.degree, p.betweenness, p.name]);
+        });
+
+        var quadSeries = [];
+        var quadNames = { I: 'I·超级枢纽', II: 'II·隐藏桥梁', III: 'III·边缘节点', IV: 'IV·局部明星' };
+        var quadOrder = ['III', 'IV', 'II', 'I'];
+        quadOrder.forEach(function(q) {
+          if (seriesByQuad[q].length > 0) {
+            var s = {
+              name: quadNames[q],
+              type: 'scatter',
+              data: seriesByQuad[q],
+              symbolSize: 5,
+              itemStyle: { color: qColors[q], opacity: q === 'III' ? 0.35 : 0.7 },
+              emphasis: { scale: 3, itemStyle: { opacity: 1 } }
+            };
+            quadSeries.push(s);
+          }
+        });
+
+        if (quadSeries.length > 0) {
+          quadSeries[0].markLine = {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { type: 'dashed', color: '#aaa', opacity: 0.5 },
+            label: { show: false },
+            data: [
+              { xAxis: dm },
+              { yAxis: bm }
+            ]
+          };
+        }
+
+        chartScatter.setOption({
+          tooltip: {
+            formatter: function(p) {
+              return '<b>' + p.data[2] + '</b><br/>度中心性: ' + (p.data[0] * 1000).toFixed(1) +
+                     '<br/>介数中心性: ' + (p.data[1] * 1000).toFixed(1) +
+                     '<br/>象限: ' + p.seriesName;
+            }
+          },
+          legend: { show: false },
+          toolbox: { feature: { dataZoom: { yAxisIndex: 'none' }, restore: {} }, right: 15, top: 5 },
+          grid: { top: 20, right: 35, bottom: 40, left: 65 },
+          xAxis: {
+            type: 'log', name: '度中心性', nameLocation: 'center', nameGap: 28,
+            nameTextStyle: { fontSize: 12, color: '#666' },
+            min: 0.000001,
+            axisLabel: { fontSize: 10 },
+            splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
+          },
+          yAxis: {
+            type: 'log', name: '介数中心性', nameLocation: 'center', nameGap: 50,
+            nameTextStyle: { fontSize: 12, color: '#666' },
+            min: 0.000001,
+            axisLabel: { fontSize: 10 },
+            splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
+          },
+          series: quadSeries
+        });
+
+        var quadSeriesIndexMap = {};
+        quadSeries.forEach(function(s, i) {
+          var q = s.name.split('·')[0];
+          quadSeriesIndexMap[q] = i;
+        });
+
+        document.querySelectorAll('#quadrantLegend span[data-quad]').forEach(function(sp) {
+          sp.addEventListener('mouseenter', function() {
+            var q = this.getAttribute('data-quad');
+            var si = quadSeriesIndexMap[q];
+            if (si !== undefined) {
+              chartScatter.dispatchAction({ type: 'highlight', seriesIndex: si });
+            }
+          });
+          sp.addEventListener('mouseleave', function() {
+            var q = this.getAttribute('data-quad');
+            var si = quadSeriesIndexMap[q];
+            if (si !== undefined) {
+              chartScatter.dispatchAction({ type: 'downplay', seriesIndex: si });
+            }
+          });
+        });
+
+        var chartCommunitySize = echarts.init(document.getElementById('chartCommunitySize'));
+        var cmSizes = d.communities.community_sizes;
+        cmSizesGlobal = cmSizes;
+        var cmLabelMapTmp = {};
+        cmSizes.forEach(function(c) {
+          var lbl = c.members && c.members.length > 0 ? c.members[0] : ('社区' + c.id);
+          cmLabelMapTmp[c.id] = lbl;
+        });
+        cmLabelMap = cmLabelMapTmp;
+        chartCommunitySize.setOption({
+          tooltip: { trigger: 'axis', formatter: function(p) { return p[0].name + '<br/>成员: ' + p[0].value + ' 人'; } },
+          grid: { left: 60, right: 25, top: 15, bottom: 55 },
+          xAxis: {
+            type: 'category',
+            data: cmSizes.map(function(c){ return cmLabelMap[c.id]; }),
+            axisLabel: { rotate: 0, fontSize: 10, interval: 0, overflow: 'truncate', width: 60 },
+            triggerEvent: true
+          },
+          yAxis: { type: 'value', name: '节点数' },
+          series: [{
+            type: 'bar',
+            data: cmSizes.map(function(c, i){
+              return { value: c.size, itemStyle: { color: i < 3 ? '#a18cd1' : '#d4c5f0' }, _cid: c.id };
+            }),
+            itemStyle: { borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', fontSize: 10, formatter: '{c}' }
+          }],
+          dataZoom: [{ type: 'slider', start: 0, end: 100, height: 18, bottom: 8 }]
+        });
+
+        communityMembersMap = {};
+        cmSizes.forEach(function(c) { communityMembersMap[c.id] = c.members || []; });
+
+        chartCommunitySize.on('click', function(params) {
+          if (params.componentType === 'series') {
+            var cid = params.data._cid;
+            if (cid !== undefined) showCommunityPopup(cid);
+          } else if (params.componentType === 'xAxis') {
+            var idx = params.axisIndex != null ? params.axisIndex : cmSizesGlobal.findIndex(function(c){ return cmLabelMap[c.id] === params.value; });
+            if (idx >= 0 && idx < cmSizesGlobal.length) {
+              showCommunityPopup(cmSizesGlobal[idx].id);
+            }
+          }
+        });
+
         chartDegree.resize();
         chartForce.resize();
+        chartScatter.resize();
+        chartKCore.resize();
+        chartCommunitySize.resize();
         AOS.init();
       })
       .catch(function() {
@@ -301,6 +598,11 @@
     window.addEventListener('resize', function() {
       if (chartDegree) chartDegree.resize();
       if (chartForce) chartForce.resize();
+      if (chartScatter) chartScatter.resize();
+      if (document.getElementById('chartCommunitySize')) {
+        var cc = echarts.getInstanceByDom(document.getElementById('chartCommunitySize'));
+        if (cc) cc.resize();
+      }
     });
   </script>
 
