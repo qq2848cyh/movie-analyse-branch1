@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>词云分析 - 精选电影数据集</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .wordcloud-section { padding: 30px 0 60px; }
+    .wc-stats-row { margin-bottom: 30px; }
+    .wc-stat-card {
+      border-radius: 12px;
+      padding: 22px 18px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      transition: transform 0.3s;
+      color: #fff;
+    }
+    .wc-stat-card:hover { transform: translateY(-4px); }
+    .wc-stat-card.wc-movies {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    .wc-stat-card.wc-titles {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    .wc-stat-card .wc-stat-icon { font-size: 32px; margin-bottom: 10px; }
+    .wc-stat-card .wc-stat-num { font-size: 1.8rem; font-weight: 700; }
+    .wc-stat-card .wc-stat-label { font-size: 0.85rem; opacity: 0.85; margin-top: 4px; }
+    .wc-filter-bar {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    .wc-filter-btn {
+      padding: 10px 28px;
+      border-radius: 30px;
+      border: 2px solid #e0e0e0;
+      background: #fff;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #666;
+    }
+    .wc-filter-btn:hover { border-color: #f5576c; color: #f5576c; }
+    .wc-filter-btn.active {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 14px rgba(245,87,108,0.35);
+    }
+    .wc-main-container { display: flex; gap: 30px; align-items: flex-start; }
+    .wc-chart-box {
+      flex: 1; min-width: 0;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+      padding: 20px;
+    }
+    .wc-chart-inner { width: 100%; height: 560px; }
+    .wc-rank-panel {
+      width: 220px; flex-shrink: 0;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+      padding: 20px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .wc-rank-panel h5 {
+      font-size: 0.95rem; font-weight: 700; color: #333;
+      margin-bottom: 16px; text-align: center;
+      padding-bottom: 12px; border-bottom: 2px solid #f0f0f0;
+    }
+    .wc-rank-item {
+      display: flex; align-items: center; padding: 6px 0;
+      font-size: 0.88rem; border-bottom: 1px solid #f8f8f8;
+    }
+    .wc-rank-idx {
+      width: 26px; height: 26px; line-height: 26px;
+      text-align: center; border-radius: 50%;
+      background: #f0f0f0; color: #999;
+      font-weight: 700; font-size: 0.78rem;
+      margin-right: 10px; flex-shrink: 0;
+    }
+    .wc-rank-idx.top3 { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
+    .wc-rank-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #555; }
+    .wc-rank-count { font-weight: 600; color: #f5576c; margin-left: 8px; flex-shrink: 0; }
+    .wc-loading { text-align: center; padding: 80px 20px; color: #999; }
+    .wc-loading i { font-size: 40px; display: block; margin-bottom: 12px; color: #ddd; }
+    .wc-empty { text-align: center; padding: 80px 20px; color: #bbb; }
+
+    @media (max-width: 768px) {
+      .wc-main-container { flex-direction: column; }
+      .wc-rank-panel { width: 100%; max-height: 300px; }
+      .wc-chart-inner { height: 400px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+      <nav class="nav-menu float-right d-none d-lg-block">
+        <ul>
+          <li><a href="/index">首页</a></li>
+          <li><a href="/movie">电影列表</a></li>
+          <li><a href="/score">数据分析</a></li>
+          <li class="active"><a href="/word">词云分析</a></li>
+          <li><a href="/aboutMe">关于项目</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section class="wordcloud-section">
+    <div class="container">
+
+      <div class="section-title">
+        <h2>词云分析</h2>
+        <p>基于 2000+ 部高分电影标题与剧情简介的深度词频统计，揭示精选电影数据集的文本特征</p>
+      </div>
+
+      <div class="row wc-stats-row justify-content-center" data-aos="fade-up">
+        <div class="col-lg-4 col-md-4 col-6">
+          <div class="wc-stat-card wc-movies">
+            <div class="wc-stat-icon">🎬</div>
+            <div class="wc-stat-num" id="statMovies">-</div>
+            <div class="wc-stat-label">精选电影</div>
+          </div>
+        </div>
+        <div class="col-lg-4 col-md-4 col-6">
+          <div class="wc-stat-card wc-titles">
+            <div class="wc-stat-icon">📝</div>
+            <div class="wc-stat-num" id="statWords">-</div>
+            <div class="wc-stat-label">剧情词汇</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wc-filter-bar" data-aos="fade-up">
+        <button class="wc-filter-btn active" data-wc="titles">🎬 电影标题</button>
+        <button class="wc-filter-btn" data-wc="summaries">📖 剧情简介</button>
+      </div>
+
+      <div class="wc-main-container" data-aos="fade-up">
+        <div class="wc-chart-box">
+          <div class="wc-chart-inner" id="wcChart"></div>
+        </div>
+        <div class="wc-rank-panel" id="wcRankPanel">
+          <h5 id="wcRankTitle">电影标题高频词 TOP 20</h5>
+          <div id="wcRankList"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">
+        &copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved
+      </div>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    var wcData = {};
+    var currentKey = 'titles';
+    var colors = ['#4facfe','#00f2fe','#43e97b','#38f9d7','#f093fb','#f5576c',
+      '#667eea','#764ba2','#a18cd1','#fbc2eb','#84fab0','#8fd3f4',
+      '#d4fc79','#96e6a1','#fccb90','#d57eeb','#fa709a','#fee140'];
+
+    function randomColor() {
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function renderCanvasWordcloud(words) {
+      var container = document.getElementById('wcChart');
+      container.innerHTML = '';
+      var canvas = document.createElement('canvas');
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      container.appendChild(canvas);
+
+      var dpr = window.devicePixelRatio || 1;
+      var rect = container.getBoundingClientRect();
+      var W = rect.width * dpr;
+      var H = rect.height * dpr;
+      canvas.width = W;
+      canvas.height = H;
+
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fafbfc';
+      ctx.fillRect(0, 0, W, H);
+
+      if (!words || words.length === 0) { return; }
+
+      var maxVal = words[0].value;
+      var minVal = words[words.length - 1].value;
+      var maxFont = Math.min(72, W / 10);
+      var minFont = Math.max(12, maxFont / 6);
+
+      var placed = [];
+      var cx = W / 2;
+      var cy = H / 2;
+
+      function getFontSize(val) {
+        return Math.round(minFont + (val - minVal) / (maxVal - minVal + 1) * (maxFont - minFont));
+      }
+
+      function overlaps(newBox) {
+        for (var i = 0; i < placed.length; i++) {
+          var b = placed[i];
+          if (!(newBox.x + newBox.w + 4 < b.x || newBox.x - 4 > b.x + b.w ||
+                newBox.y + newBox.h + 4 < b.y || newBox.y - 4 > b.y + b.h)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      for (var i = 0; i < words.length; i++) {
+        var fontSize = getFontSize(words[i].value);
+        ctx.font = 'bold ' + fontSize + 'px "Microsoft YaHei","PingFang SC",sans-serif';
+        var metrics = ctx.measureText(words[i].name);
+        var tw = metrics.width;
+        var th = fontSize * 1.2;
+
+        var found = false;
+        var maxR = Math.max(W, H);
+        for (var r = 0; r < maxR && !found; r += 8) {
+          for (var a = 0; a < 360 && !found; a += 8) {
+            var rad = a * Math.PI / 180;
+            var x = cx + r * Math.cos(rad) - tw / 2;
+            var y = cy + r * Math.sin(rad) - th / 2;
+            var box = { x: x, y: y, w: tw, h: th };
+            if (x > 4 && y > 4 && x + tw < W - 4 && y + th < H - 4 && !overlaps(box)) {
+              placed.push(box);
+              ctx.fillStyle = i < colors.length ? colors[i] : randomColor();
+              ctx.textBaseline = 'top';
+              ctx.fillText(words[i].name, x, y);
+              found = true;
+            }
+          }
+        }
+      }
+    }
+
+    function renderRankList(words) {
+      var top20 = words.slice(0, 20);
+      var html = '';
+      for (var i = 0; i < top20.length; i++) {
+        var cls = i < 3 ? ' top3' : '';
+        html += '<div class="wc-rank-item">' +
+          '<span class="wc-rank-idx' + cls + '">' + (i + 1) + '</span>' +
+          '<span class="wc-rank-name" title="' + top20[i].name + '">' + top20[i].name + '</span>' +
+          '<span class="wc-rank-count">' + top20[i].value + '</span>' +
+        '</div>';
+      }
+      document.getElementById('wcRankList').innerHTML = html;
+    }
+
+    function updateWordcloud(key) {
+      currentKey = key;
+      var words = wcData[key] || [];
+      renderCanvasWordcloud(words);
+      renderRankList(words);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var chartDiv = document.getElementById('wcChart');
+      chartDiv.innerHTML = '<div class="wc-loading"><i class="icofont-spinner icofont-spin"></i>正在加载词云数据...</div>';
+
+      fetch('/api/wordcloud/data')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+          wcData.titles = res.titles || [];
+          wcData.summaries = res.summaries || [];
+          document.getElementById('statMovies').textContent = '2065';
+          document.getElementById('statWords').textContent = wcData.titles.length + wcData.summaries.length;
+          updateWordcloud('titles');
+        }).catch(function() {
+          chartDiv.innerHTML = '<div class="wc-empty">数据加载失败，请刷新页面重试</div>';
+        });
+
+      document.querySelectorAll('.wc-filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.wc-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+          this.classList.add('active');
+          var key = this.getAttribute('data-wc');
+          updateWordcloud(key);
+          var titles = {
+            titles: '电影标题高频词 TOP 20',
+            summaries: '剧情简介高频词 TOP 20'
+          };
+          document.getElementById('wcRankTitle').textContent = titles[key] || '高频词汇 TOP 20';
+        });
+      });
+
+      window.addEventListener('resize', function() {
+        if (wcData[currentKey]) renderCanvasWordcloud(wcData[currentKey]);
+      });
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>协作网络分析 - 电影数据分析平台</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <script src="{{ url_for('static', filename='assets/js/echarts.min.js') }}"></script>
+
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    #footer { margin-top: auto; }
+    .na-section { padding: 20px 0 40px; flex: 1; }
+    .na-stat-card {
+      background: #fff; border-radius: 12px;
+      padding: 18px 14px; text-align: center;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+      transition: transform 0.3s;
+    }
+    .na-stat-card:hover { transform: translateY(-3px); }
+    .na-stat-val { font-size: 1.5rem; font-weight: 700; color: #333; }
+    .na-stat-label { font-size: 0.8rem; color: #999; margin-top: 4px; }
+    .na-stat-icon { font-size: 24px; margin-bottom: 6px; }
+    .na-chart-box {
+      background: #fff; border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+      padding: 18px; margin-bottom: 24px;
+    }
+    .na-chart-inner { width: 100%; height: 450px; }
+    .na-half { width: 100%; height: 400px; }
+    .na-rank-title {
+      font-size: 1rem; font-weight: 700; color: #333;
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    .na-rank-item {
+      display: flex; align-items: center; padding: 5px 0;
+      font-size: 0.85rem; border-bottom: 1px solid #f8f8f8;
+    }
+    .na-rank-idx {
+      width: 24px; height: 24px; line-height: 24px;
+      text-align: center; border-radius: 50%;
+      background: #f0f0f0; color: #999;
+      font-weight: 700; font-size: 0.72rem;
+      margin-right: 8px; flex-shrink: 0;
+    }
+    .na-rank-idx.top3 { background: linear-gradient(135deg, #a18cd1, #fbc2eb); color: #fff; }
+    .na-rank-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .na-rank-val { font-weight: 600; color: #8b5cf6; margin-left: 6px; flex-shrink: 0; }
+    .na-loading { text-align: center; padding: 60px; color: #999; }
+    .na-loading i { font-size: 36px; display: block; margin-bottom: 10px; }
+
+    @media (max-width: 768px) {
+      .na-chart-inner { height: 320px; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+      <nav class="nav-menu float-right d-none d-lg-block">
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/index">精选电影</a></li>
+          <li><a href="/bigdata/index">大数据集</a></li>
+          <li class="active"><a href="/analysis/network">网络分析</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section class="na-section">
+    <div class="container">
+
+      <div class="section-title">
+        <h2>协作网络分析</h2>
+        <p>基于演员协作关系构建社交网络图，分析小世界特性、度分布与社区结构</p>
+      </div>
+
+      <div id="naLoading" class="na-loading">
+        <i class="icofont-spinner icofont-spin"></i>正在构建协作网络（约需 3-4 分钟，仅首次加载）...
+      </div>
+
+      <div id="naContent" style="display:none;">
+
+        <div class="row mb-4" data-aos="fade-up">
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f5576c"><div class="na-stat-icon">🔗</div><div class="na-stat-val" id="sNodes">-</div><div class="na-stat-label">演员节点</div></div></div>
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #4facfe"><div class="na-stat-icon">🕸️</div><div class="na-stat-val" id="sEdges">-</div><div class="na-stat-label">协作边</div></div></div>
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #43e97b"><div class="na-stat-icon">📐</div><div class="na-stat-val" id="sDegree">-</div><div class="na-stat-label">平均度</div></div></div>
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #a18cd1"><div class="na-stat-icon">🌐</div><div class="na-stat-val" id="sPath">-</div><div class="na-stat-label">平均路径</div></div></div>
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #f093fb"><div class="na-stat-icon">△</div><div class="na-stat-val" id="sCluster">-</div><div class="na-stat-label">集聚系数</div></div></div>
+          <div class="col-md-2 col-6"><div class="na-stat-card" style="border-top:3px solid #fcb69f"><div class="na-stat-icon">🧩</div><div class="na-stat-val" id="sCommunities">-</div><div class="na-stat-label">社区数量</div></div></div>
+        </div>
+
+        <div class="na-chart-box" data-aos="fade-up">
+          <h5 class="na-rank-title">📈 度分布（双对数坐标）</h5>
+          <div class="na-chart-inner" id="chartDegree"></div>
+        </div>
+
+        <div class="na-chart-box" data-aos="fade-up">
+          <h5 class="na-rank-title">🔗 协作网络力导向图</h5>
+          <div class="na-chart-inner" id="chartForce"></div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="na-chart-box">
+              <h5 class="na-rank-title">🏆 度中心性 TOP 15</h5>
+              <div id="rankDegree"></div>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="na-chart-box">
+              <h5 class="na-rank-title">⭐ 介数中心性 TOP 15</h5>
+              <div id="rankBetweenness"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="na-chart-box" data-aos="fade-up">
+          <h5 class="na-rank-title">🔬 小世界特性验证</h5>
+          <div class="row text-center">
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.85rem;">实际网络集聚系数</p>
+              <p style="font-size:1.8rem; font-weight:700; color:#f5576c;" id="swCluster">-</p>
+            </div>
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.85rem;">随机网络集聚系数</p>
+              <p style="font-size:1.8rem; font-weight:700; color:#3498db;" id="swRandCluster">-</p>
+            </div>
+            <div class="col-md-4">
+              <p style="color:#999; font-size:0.85rem;">判定结论</p>
+              <p style="font-size:1.4rem; font-weight:700; color:#43e97b;" id="swVerdict">-</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">
+        &copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved
+      </div>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    var chartDegree = null;
+    var chartForce = null;
+    var pollTimer = null;
+
+    function loadData() {
+      fetch('/api/analysis/network/stats')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.status === 'warming') {
+            if (!pollTimer) {
+              document.getElementById('naLoading').innerHTML =
+                '<i class="icofont-spinner icofont-spin" style="font-size:36px;display:block;margin-bottom:10px;"></i>' +
+                d.message + '（首次约需 3-4 分钟）...';
+              pollTimer = setInterval(loadData, 5000);
+            }
+            return;
+          }
+
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          document.getElementById('naLoading').style.display = 'none';
+          document.getElementById('naContent').style.display = 'block';
+
+          if (!chartDegree) chartDegree = echarts.init(document.getElementById('chartDegree'));
+          if (!chartForce) chartForce = echarts.init(document.getElementById('chartForce'));
+
+        var g = d.global_stats;
+        document.getElementById('sNodes').textContent = g.nodes.toLocaleString();
+        document.getElementById('sEdges').textContent = (g.edges / 1000).toFixed(0) + 'K';
+        document.getElementById('sDegree').textContent = g.avg_degree;
+        document.getElementById('sPath').textContent = g.avg_path;
+        document.getElementById('sCluster').textContent = g.clustering;
+        document.getElementById('sCommunities').textContent = d.communities.num_communities;
+
+        document.getElementById('swCluster').textContent = g.clustering;
+        document.getElementById('swRandCluster').textContent = g.random_clustering;
+        document.getElementById('swVerdict').textContent = g.is_small_world ? '✓ 具有小世界特性' : '✗ 不满足';
+        document.getElementById('swVerdict').style.color = g.is_small_world ? '#43e97b' : '#f5576c';
+
+        var dist = d.degree_distribution.distribution;
+        chartDegree.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { top: 50, right: 35, bottom: 70, left: 70 },
+          title: {
+            text: d.degree_distribution.powerlaw_fit,
+            subtext: '线性拟合 R² > 0.85',
+            left: 'center', top: 5,
+            textStyle: { fontSize: 13, color: '#555' },
+            subtextStyle: { fontSize: 11, color: '#999' }
+          },
+          xAxis: {
+            type: 'log', name: '度 (k)', nameLocation: 'center', nameGap: 48,
+            min: 1, axisLabel: { rotate: 25, fontSize: 10, interval: 0 },
+            splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
+          },
+          yAxis: {
+            type: 'log', name: '频次 P(k)', nameLocation: 'center', nameGap: 55,
+            axisLabel: { fontSize: 11 },
+            splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
+          },
+          series: [{
+            type: 'scatter',
+            data: dist.map(function(p) { return [p.degree, p.count]; }),
+            symbolSize: 6,
+            itemStyle: { color: '#a18cd1' }
+          }]
+        });
+
+        var fg = d.force_graph;
+        chartForce.setOption({
+          tooltip: {
+            formatter: function(p) {
+              if (p.dataType === 'node') return p.data.name + ' (社区 ' + (p.data.category + 1) + ')';
+              return '';
+            }
+          },
+          legend: { show: false },
+          series: [{
+            type: 'graph',
+            layout: 'force',
+            force: { repulsion: 120, edgeLength: [30, 120], gravity: 0.08 },
+            roam: true,
+            draggable: true,
+            data: fg.nodes,
+            links: fg.links,
+            categories: fg.categories,
+            itemStyle: { borderColor: '#fff', borderWidth: 1 },
+            label: { show: false },
+            emphasis: { label: { show: true, fontSize: 12 } },
+            lineStyle: { color: '#ddd', curveness: 0.1, opacity: 0.3 }
+          }]
+        });
+
+        function renderRank(container, data) {
+          var h = '';
+          data.slice(0, 15).forEach(function(x, i) {
+            h += '<div class="na-rank-item">' +
+              '<span class="na-rank-idx' + (i < 3 ? ' top3' : '') + '">' + (i + 1) + '</span>' +
+              '<span class="na-rank-name" title="' + x.name + '">' + x.name + '</span>' +
+              '<span class="na-rank-val">' + (x.value * 1000).toFixed(1) + '</span>' +
+            '</div>';
+          });
+          document.getElementById(container).innerHTML = h;
+        }
+
+        renderRank('rankDegree', d.centrality.degree);
+        renderRank('rankBetweenness', d.centrality.betweenness);
+
+        chartDegree.resize();
+        chartForce.resize();
+        AOS.init();
+      })
+      .catch(function() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        document.getElementById('naLoading').innerHTML =
+          '<p style="color:#f5576c;">数据加载失败，请刷新页面重试</p>';
+      });
+    }
+
+    loadData();
+
+    window.addEventListener('resize', function() {
+      if (chartDegree) chartDegree.resize();
+      if (chartForce) chartForce.resize();
+    });
+  </script>
+
+</body>
+</html>

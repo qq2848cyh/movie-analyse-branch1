@@ -1,0 +1,8 @@
+*.png
+*.csv
+*.json
+*.log
+*.pyc
+*.xlsx
+*.pkl
+data/

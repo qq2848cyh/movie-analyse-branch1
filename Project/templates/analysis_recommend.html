@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>电影推荐系统 - 电影数据分析平台</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    #footer { margin-top: auto; }
+    #team.team { flex: 1; }
+    .rec-search { text-align: center; margin-bottom: 30px; }
+    .rec-search input {
+      width: 55%; max-width: 480px; padding: 12px 20px;
+      border-radius: 50px; border: 1px solid #ddd;
+      font-size: 0.95rem; outline: none; transition: all 0.3s;
+    }
+    .rec-search input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .rec-search button {
+      padding: 12px 28px; border-radius: 50px; border: none;
+      background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-left: 8px;
+      transition: all 0.3s;
+    }
+    .rec-search button:hover { box-shadow: 0 4px 14px rgba(59,130,246,0.4); }
+    .rec-result { margin-top: 20px; }
+    .rec-card {
+      background: #fff; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      padding: 18px 22px; margin-bottom: 12px;
+      display: flex; align-items: center; transition: transform 0.2s;
+    }
+    .rec-card:hover { transform: translateX(4px); }
+    .rec-rank { width: 36px; height: 36px; line-height: 36px; text-align: center; border-radius: 50%;
+      background: #eff6ff; color: #3b82f6; font-weight: 700; margin-right: 14px; flex-shrink: 0; }
+    .rec-rank.top3 { background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff; }
+    .rec-name { flex: 1; font-weight: 600; color: #333; }
+    .rec-score { font-weight: 600; color: #3b82f6; font-size: 0.95rem; }
+    .rec-empty { text-align: center; padding: 60px; color: #999; }
+    .rec-loading { text-align: center; padding: 40px; color: #999; }
+    .rec-info-box {
+      background: #eff6ff; border-radius: 12px; padding: 18px 22px;
+      margin-bottom: 24px; text-align: center; color: #3b82f6;
+    }
+    .rec-info-box h5 { margin: 0; font-weight: 600; }
+    .rec-info-box p { margin: 6px 0 0; font-size: 0.85rem; opacity: 0.8; }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+      <nav class="nav-menu float-right d-none d-lg-block">
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/index">精选电影</a></li>
+          <li><a href="/bigdata/index">大数据集</a></li>
+          <li class="active"><a href="/analysis/recommend">推荐系统</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section id="team" class="team">
+    <div class="container">
+
+      <div class="section-title">
+        <h2>电影推荐系统</h2>
+        <p>基于 TF-IDF 内容特征的电影相似度推荐 — 输入电影名，发现相似好片</p>
+      </div>
+
+      <div class="rec-info-box" data-aos="fade-up">
+        <h5>内容推荐模式</h5>
+        <p>基于电影的类型、导演、演员和剧情简介构建特征向量，通过余弦相似度匹配最相近的电影</p>
+      </div>
+
+      <div class="rec-search" data-aos="fade-up">
+        <input type="text" id="movieInput" placeholder="输入电影名称，如：我不是药神、流浪地球..."
+               onkeydown="if(event.key==='Enter')doSearch()">
+        <button onclick="doSearch()">搜索推荐</button>
+      </div>
+
+      <div id="recLoading" class="rec-loading" style="display:none;">
+        <i class="icofont-spinner icofont-spin"></i> 正在分析...
+      </div>
+
+      <div id="recResults" class="rec-result"></div>
+
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container"><div class="copyright">&copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved</div></div>
+  </footer>
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    var contentReady = false;
+
+    function doSearch() {
+      var movie = document.getElementById('movieInput').value.trim();
+      if (!movie) return;
+
+      document.getElementById('recLoading').style.display = 'block';
+      document.getElementById('recResults').innerHTML = '';
+
+      fetch('/api/analysis/recommend/by_movie?movie=' + encodeURIComponent(movie))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          document.getElementById('recLoading').style.display = 'none';
+          if (d.status === 'warming') {
+            document.getElementById('recResults').innerHTML =
+              '<div class="rec-empty">推荐引擎正在预热中，请等待约 30 秒后重试...</div>';
+            return;
+          }
+          if (!d.results || d.results.length === 0) {
+            document.getElementById('recResults').innerHTML =
+              '<div class="rec-empty">未找到与 "' + d.query + '" 相似的电影</div>';
+            return;
+          }
+          var h = '<h5 style="margin-bottom:14px;color:#555;">与 <strong style="color:#3b82f6;">' + d.query + '</strong> 相似的电影 TOP ' + d.results.length + '</h5>';
+          d.results.forEach(function(m, i) {
+            h += '<div class="rec-card" data-aos="fade-up">' +
+              '<span class="rec-rank' + (i < 3 ? ' top3' : '') + '">' + (i + 1) + '</span>' +
+              '<span class="rec-name">' + m.name + '</span>' +
+              '<span class="rec-score">相似度 ' + (m.similarity * 100).toFixed(0) + '%</span>' +
+            '</div>';
+          });
+          document.getElementById('recResults').innerHTML = h;
+          AOS.init();
+        }).catch(function() {
+          document.getElementById('recLoading').style.display = 'none';
+          document.getElementById('recResults').innerHTML = '<div class="rec-empty">查询失败，请稍后重试</div>';
+        });
+    }
+  </script>
+
+</body>
+</html>

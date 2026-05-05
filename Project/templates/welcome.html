@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>电影数据分析平台</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .welcome-hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    .welcome-container {
+      text-align: center;
+      width: 100%;
+      max-width: 1060px;
+    }
+    .welcome-title h2 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #1c5c93;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+    .welcome-title p {
+      font-size: 1rem;
+      color: #888;
+      max-width: 550px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .welcome-divider {
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #428bca, #20b38e);
+      margin: 22px auto 36px;
+      border-radius: 2px;
+    }
+
+    .feature-grid {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .feature-card {
+      position: relative;
+      width: 188px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px 20px 26px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.07);
+      transition: all 0.35s cubic-bezier(0.25,0.8,0.25,1.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 16px 16px 0 0;
+      transition: height 0.3s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.13);
+    }
+    .feature-card:hover::before { height: 6px; }
+
+    .card-curated::before   { background: linear-gradient(90deg, #f093fb, #f5576c); }
+    .card-bigdata::before   { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+    .card-network::before   { background: linear-gradient(90deg, #a18cd1, #fbc2eb); }
+    .card-sentiment::before { background: linear-gradient(90deg, #fad0c4, #ffd1ff); }
+    .card-recommend::before { background: linear-gradient(90deg, #a1c4fd, #c2e9fb); }
+
+    .fc-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      font-size: 30px;
+      transition: transform 0.3s ease;
+    }
+    .feature-card:hover .fc-icon { transform: scale(1.08); }
+    .card-curated .fc-icon   { background: #fff0f0; color: #e74c3c; }
+    .card-bigdata .fc-icon   { background: #eef6fd; color: #3498db; }
+    .card-network .fc-icon   { background: #f3f0fa; color: #8b5cf6; }
+    .card-sentiment .fc-icon { background: #fef5f5; color: #f5576c; }
+    .card-recommend .fc-icon { background: #eff6ff; color: #3b82f6; }
+
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 3px;
+    }
+    .feature-card .fc-sub {
+      font-size: 0.7rem;
+      color: #bbb;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+    }
+    .feature-card .fc-desc {
+      font-size: 0.8rem;
+      color: #999;
+      line-height: 1.55;
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+    .fc-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .fc-tag {
+      padding: 3px 10px;
+      border-radius: 14px;
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+    .card-curated .fc-tag   { background: #fef0ef; color: #e74c3c; }
+    .card-bigdata .fc-tag   { background: #eef6fd; color: #3498db; }
+    .card-network .fc-tag   { background: #f3f0fa; color: #8b5cf6; }
+    .card-sentiment .fc-tag { background: #fef5f5; color: #f5576c; }
+    .card-recommend .fc-tag { background: #eff6ff; color: #3b82f6; }
+
+    .fc-btn {
+      display: inline-block;
+      padding: 8px 24px;
+      border-radius: 50px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+    }
+    .fc-btn:hover { transform: translateY(-1px); }
+
+    .card-curated .fc-btn   { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; box-shadow: 0 4px 14px rgba(245,87,108,0.3); }
+    .card-curated .fc-btn:hover   { box-shadow: 0 7px 22px rgba(245,87,108,0.45); color: #fff; }
+    .card-bigdata .fc-btn   { background: linear-gradient(135deg, #4facfe, #00f2fe); color: #fff; box-shadow: 0 4px 14px rgba(79,172,254,0.3); }
+    .card-bigdata .fc-btn:hover   { box-shadow: 0 7px 22px rgba(79,172,254,0.45); color: #fff; }
+    .card-network .fc-btn   { background: linear-gradient(135deg, #a18cd1, #fbc2eb); color: #fff; box-shadow: 0 4px 14px rgba(161,140,209,0.3); }
+    .card-network .fc-btn:hover   { box-shadow: 0 7px 22px rgba(161,140,209,0.45); color: #fff; }
+    .card-sentiment .fc-btn { background: linear-gradient(135deg, #fad0c4, #ffd1ff); color: #a04040; box-shadow: 0 4px 14px rgba(245,87,108,0.2); }
+    .card-sentiment .fc-btn:hover { box-shadow: 0 7px 22px rgba(245,87,108,0.35); color: #a04040; }
+    .card-recommend .fc-btn { background: linear-gradient(135deg, #a1c4fd, #c2e9fb); color: #fff; box-shadow: 0 4px 14px rgba(59,130,246,0.25); }
+    .card-recommend .fc-btn:hover { box-shadow: 0 7px 22px rgba(59,130,246,0.4); color: #fff; }
+
+    @media (max-width: 1060px) {
+      .feature-card { width: 170px; padding: 26px 16px 22px; }
+      .feature-grid { gap: 16px; }
+    }
+    @media (max-width: 768px) {
+      .feature-grid { flex-direction: column; align-items: center; gap: 18px; }
+      .feature-card { width: 260px; padding: 28px 24px 24px; }
+      .welcome-title h2 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+    </div>
+  </header>
+
+  <section class="welcome-hero">
+    <div class="welcome-container">
+
+      <div class="welcome-title" data-aos="fade-down">
+        <h2>电影数据可视化分析平台</h2>
+        <p>基于 Flask + ECharts 构建，覆盖数据统计、智能分析与预测的全方位电影数据洞察</p>
+      </div>
+
+      <div class="welcome-divider" data-aos="zoom-in"></div>
+
+      <div class="feature-grid">
+
+        <div class="feature-card card-curated" data-aos="fade-up" data-aos-delay="0">
+          <div class="fc-icon"><i class="icofont-trophy"></i></div>
+          <h3>精选电影</h3>
+          <p class="fc-sub">Curated</p>
+          <p class="fc-desc">2000+ 高分电影，评分、年份、类型多维度交互分析</p>
+          <div class="fc-tags">
+            <span class="fc-tag">2000部</span>
+            <span class="fc-tag">词云</span>
+          </div>
+          <a href="/index" class="fc-btn">进入 <i class="icofont-simple-right"></i></a>
+        </div>
+
+        <div class="feature-card card-bigdata" data-aos="fade-up" data-aos-delay="80">
+          <div class="fc-icon"><i class="icofont-database"></i></div>
+          <h3>大数据集</h3>
+          <p class="fc-sub">Big Data</p>
+          <p class="fc-desc">2.6 万电影 + 269 万评论，海量数据深度统计</p>
+          <div class="fc-tags">
+            <span class="fc-tag">26K电影</span>
+            <span class="fc-tag">269万评论</span>
+          </div>
+          <a href="/bigdata/index" class="fc-btn">进入 <i class="icofont-simple-right"></i></a>
+        </div>
+
+        <div class="feature-card card-network" data-aos="fade-up" data-aos-delay="160">
+          <div class="fc-icon"><i class="icofont-network"></i></div>
+          <h3>网络分析</h3>
+          <p class="fc-sub">Network</p>
+          <p class="fc-desc">6.2 万人协作网络，图论分析与社区检测</p>
+          <div class="fc-tags">
+            <span class="fc-tag">图论</span>
+            <span class="fc-tag">社区</span>
+          </div>
+          <a href="/analysis/network" class="fc-btn">进入 <i class="icofont-simple-right"></i></a>
+        </div>
+
+        <div class="feature-card card-sentiment" data-aos="fade-up" data-aos-delay="240">
+          <div class="fc-icon"><i class="icofont-speech-comments"></i></div>
+          <h3>情感分析</h3>
+          <p class="fc-sub">Sentiment</p>
+          <p class="fc-desc">NLP 多模型对比，评论文本情感挖掘</p>
+          <div class="fc-tags">
+            <span class="fc-tag">NLP</span>
+            <span class="fc-tag">关键词</span>
+          </div>
+          <a href="/analysis/sentiment" class="fc-btn">进入 <i class="icofont-simple-right"></i></a>
+        </div>
+
+        <div class="feature-card card-recommend" data-aos="fade-up" data-aos-delay="320">
+          <div class="fc-icon"><i class="icofont-light-bulb"></i></div>
+          <h3>推荐系统</h3>
+          <p class="fc-sub">Recommend</p>
+          <p class="fc-desc">协同过滤与内容推荐的混合算法</p>
+          <div class="fc-tags">
+            <span class="fc-tag">协同过滤</span>
+            <span class="fc-tag">相似度</span>
+          </div>
+          <a href="/analysis/recommend" class="fc-btn">进入 <i class="icofont-simple-right"></i></a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">
+        &copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved
+      </div>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+</body>
+</html>

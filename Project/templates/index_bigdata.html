@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>大数据电影集分析</title>
+  <meta content="" name="descriptison">
+  <meta content="" name="keywords">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/venobox/venobox.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+      <nav class="nav-menu float-right d-none d-lg-block">
+        <ul>
+          <li class="active"><a href="/bigdata/index">首页</a></li>
+          <li><a href="/bigdata/movie">电影列表</a></li>
+          <li><a href="/bigdata/score">数据分析</a></li>
+          <li><a href="/bigdata/word">词云分析</a></li>
+          <li><a href="/aboutMe">关于项目</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section id="team" class="team">
+    <div class="container">
+      <div style="color:#3498db" class="section-title">
+        <h2>大数据电影集数据分析</h2>
+        <p>基于海量电影数据集，应用Python爬虫、Flask框架、ECharts交互式可视化与词云分析等技术实现</p>
+      </div>
+
+      <section class="counts section-bg">
+        <div class="container">
+          <div class="row">
+
+            <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up">
+              <a href="/bigdata/movie">
+                <div class="count-box">
+                  <i class="icofont-simple-smile" style="color: #20b38e;"></i>
+                  <span data-toggle="counter-up">140000</span>
+                  <p>海量电影</p>
+                </div>
+              </a>
+            </div>
+
+            <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="200">
+              <a href="/bigdata/score">
+                <div class="count-box">
+                  <i class="icofont-document-folder" style="color: #c042ff;"></i>
+                  <span data-toggle="counter-up">5</span>
+                  <p>分析维度</p>
+                </div>
+              </a>
+            </div>
+
+            <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="400">
+              <a href="/bigdata/word">
+                <div class="count-box">
+                  <i class="icofont-live-support" style="color: #46d1ff;"></i>
+                  <span data-toggle="counter-up">4420000</span>
+                  <p>用户评论</p>
+                </div>
+              </a>
+            </div>
+
+            <div class="col-lg-3 col-md-6 text-center" data-aos="fade-up" data-aos-delay="600">
+              <a href="/aboutMe">
+                <div class="count-box">
+                  <i class="icofont-users-alt-5" style="color: #ffb459;"></i>
+                  <span data-toggle="counter-up">1</span>
+                  <p>关于我</p>
+                </div>
+              </a>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container">
+      <div class="copyright">
+        &copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved
+      </div>
+    </div>
+  </footer>
+
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+</body>
+</html>

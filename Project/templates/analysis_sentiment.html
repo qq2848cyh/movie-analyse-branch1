@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>评论情感分析 - 电影数据分析平台</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,600,600i,700,700i,900" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/icofont/icofont.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/boxicons/css/boxicons.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/animate.css/animate.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <script src="{{ url_for('static', filename='assets/js/echarts.min.js') }}"></script>
+
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+    #footer { margin-top: auto; }
+    #team.team { flex: 1; }
+    .sa-chart-box { background: #fff; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.07); padding: 18px; margin-bottom: 24px; }
+    .sa-chart-inner { width: 100%; height: 380px; }
+    .sa-metric { text-align: center; padding: 10px 0; }
+    .sa-metric-val { font-size: 1.4rem; font-weight: 700; }
+    .sa-metric-label { font-size: 0.75rem; color: #999; margin-top: 2px; }
+    .sa-rank-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #f0f0f0; }
+    .sa-loading { text-align: center; padding: 60px; color: #999; }
+  </style>
+</head>
+
+<body>
+
+  <header id="header">
+    <div class="container">
+      <div class="logo float-left">
+        <h1 class="text-light"><a href="/"><span>Alighieri</span></a></h1>
+      </div>
+      <nav class="nav-menu float-right d-none d-lg-block">
+        <ul>
+          <li><a href="/">首页</a></li>
+          <li><a href="/index">精选电影</a></li>
+          <li><a href="/bigdata/index">大数据集</a></li>
+          <li class="active"><a href="/analysis/sentiment">情感分析</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <section id="team" class="team">
+    <div class="container">
+
+      <div class="section-title">
+        <h2>评论情感分析</h2>
+        <p>基于机器学习的中文电影评论情感分类 — 多模型对比 + 关键词挖掘 + 时间趋势</p>
+      </div>
+
+      <div id="saLoading" class="sa-loading">
+        <i class="icofont-spinner icofont-spin" style="font-size:36px;display:block;margin-bottom:10px;"></i>正在训练模型（约需 30-60 秒，仅首次加载）...
+      </div>
+
+      <div id="saContent" style="display:none;">
+
+        <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">多模型分类性能对比</h5>
+          <div class="row text-center" id="metricsRow"></div>
+        </div>
+
+        <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">评分分布</h5>
+          <div class="sa-chart-inner" id="chartRatingDist"></div>
+        </div>
+
+        <div class="row">
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="sa-chart-box">
+              <h5 class="sa-rank-title">正面评论关键词</h5>
+              <div id="posWords" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+            </div>
+          </div>
+          <div class="col-lg-6" data-aos="fade-up">
+            <div class="sa-chart-box">
+              <h5 class="sa-rank-title">负面评论关键词</h5>
+              <div id="negWords" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">评分趋势（2005-2019）</h5>
+          <div class="sa-chart-inner" id="chartTrend"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="container"><div class="copyright">&copy; Copyright <strong><span>Alighieri</span></strong>. All Rights Reserved</div></div>
+  </footer>
+  <a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+  <script src="{{ url_for('static', filename='assets/vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery.easing/jquery.easing.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/jquery-sticky/jquery.sticky.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/venobox/venobox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/waypoints/jquery.waypoints.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/counterup/counterup.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    var chartRD = null;
+    var chartT = null;
+    var pollTimer = null;
+
+    function loadData() {
+      fetch('/api/analysis/sentiment/all')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.status === 'warming') {
+            if (!pollTimer) {
+              document.getElementById('saLoading').innerHTML =
+                '<i class="icofont-spinner icofont-spin" style="font-size:36px;display:block;margin-bottom:10px;"></i>' +
+                d.message + '（首次约需 40-60 秒）...';
+              pollTimer = setInterval(loadData, 4000);
+            }
+            return;
+          }
+
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          document.getElementById('saLoading').style.display = 'none';
+          document.getElementById('saContent').style.display = 'block';
+
+          if (!chartRD) chartRD = echarts.init(document.getElementById('chartRatingDist'));
+          if (!chartT) chartT = echarts.init(document.getElementById('chartTrend'));
+
+        var clf = d.classification;
+        var colors = { NaiveBayes: '#4facfe', LogisticRegression: '#43e97b', LightGBM: '#f093fb' };
+        var h = '';
+        Object.keys(clf.metrics).forEach(function(k) {
+          var m = clf.metrics[k];
+          h += '<div class="col-md-4 sa-metric"><div class="sa-metric-val" style="color:' + (colors[k]||'#333') + '">' +
+            (m.accuracy*100).toFixed(1) + '%</div><div class="sa-metric-label">' + k + ' (CV: ' + (m.cv_mean*100).toFixed(1) + '%)</div></div>';
+        });
+        document.getElementById('metricsRow').innerHTML = h;
+
+        var rd = d.rating_distribution;
+        chartRD.setOption({
+          tooltip: {},
+          xAxis: { data: rd.labels, name: '评分' },
+          yAxis: { name: '评论数' },
+          series: [{ type: 'bar', data: rd.counts,
+            itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+              [{offset:0,color:'#f093fb'},{offset:1,color:'#f5576c'}]) } }]
+        });
+
+        var kw = clf.key_words;
+        function renderWords(el, words, gradient) {
+          var h = '';
+          words.slice(0, 25).forEach(function(w, i) {
+            var size = 0.75 + (words.length - i) / words.length * 0.5;
+            h += '<span style="display:inline-block;padding:3px 10px;border-radius:14px;font-size:' +
+              size.toFixed(2) + 'rem;font-weight:500;background:' + gradient + ';color:#fff;margin:3px;">' + w.word + '</span>';
+          });
+          document.getElementById(el).innerHTML = h;
+        }
+        renderWords('posWords', kw.positive, 'linear-gradient(135deg, #43e97b, #38f9d7)');
+        renderWords('negWords', kw.negative, 'linear-gradient(135deg, #f093fb, #f5576c)');
+
+        var trend = d.trend;
+        chartT.setOption({
+          tooltip: { trigger: 'axis' },
+          legend: { data: ['平均评分', '正面比例(%)'] },
+          xAxis: { data: trend.map(function(t) { return t.year; }) },
+          yAxis: [
+            { type: 'value', name: '评分', min: 3, max: 5 },
+            { type: 'value', name: '正面比例(%)', min: 30, max: 90 }
+          ],
+          series: [
+            { name: '平均评分', type: 'line', data: trend.map(function(t) { return t.avg_rating; }), itemStyle: { color: '#f5576c' }, smooth: true },
+            { name: '正面比例(%)', type: 'line', yAxisIndex: 1, data: trend.map(function(t) { return t.positive_ratio; }), itemStyle: { color: '#4facfe' }, smooth: true }
+          ]
+        });
+
+        chartRD.resize();
+        chartT.resize();
+        AOS.init();
+      }).catch(function() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        document.getElementById('saLoading').innerHTML = '<p style="color:#f5576c;">加载失败</p>';
+      });
+    }
+
+    loadData();
+
+    window.addEventListener('resize', function() { if (chartRD) chartRD.resize(); if (chartT) chartT.resize(); });
+  </script>
+
+</body>
+</html>
