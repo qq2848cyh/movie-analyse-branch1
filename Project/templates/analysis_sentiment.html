@@ -75,6 +75,11 @@
         </div>
 
         <div class="sa-chart-box" data-aos="fade-up">
+          <h5 class="sa-rank-title">BiLSTM 训练 / 验证曲线</h5>
+          <div class="sa-chart-inner-short" id="chartTrainCurve"></div>
+        </div>
+
+        <div class="sa-chart-box" data-aos="fade-up">
           <h5 class="sa-rank-title">五分类 F1 对比</h5>
           <div class="sa-chart-inner-short" id="chartF1Compare"></div>
         </div>
@@ -176,6 +181,7 @@
     var chartF1 = null;
     var chartCM_ML = null;
     var chartCM_DL = null;
+    var chartTrain = null;
     var pollTimer = null;
     var dlPollTimer = null;
     var mlData = null;
@@ -285,6 +291,39 @@
 
       h = mlRow + dlRow;
       document.getElementById('metricsRow').innerHTML = h;
+    }
+
+    var curveData = null;
+
+    function renderTrainCurve(data) {
+      if (!data || !data.dl_2cls_history) return;
+      if (!chartTrain) chartTrain = echarts.init(document.getElementById('chartTrainCurve'));
+
+      var h = data.dl_2cls_history;
+      var epochs = h.map(function(x) { return x.epoch; });
+      var valF1 = h.map(function(x) { return x.val_f1; });
+      var valAcc = h.map(function(x) { return x.val_acc; });
+
+      chartTrain.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['验证 F1', '验证 Accuracy'] },
+        xAxis: { type: 'category', data: epochs, name: 'Epoch' },
+        yAxis: { type: 'value', name: 'Score', min: 0.6, max: 0.9 },
+        series: [
+          { name: '验证 F1', type: 'line', data: valF1, itemStyle: { color: '#667eea' }, smooth: true },
+          { name: '验证 Accuracy', type: 'line', data: valAcc, itemStyle: { color: '#f093fb' }, smooth: true }
+        ]
+      });
+    }
+
+    function loadCurves() {
+      fetch('/api/analysis/sentiment/dl/curves')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          curveData = d;
+          renderTrainCurve(d);
+        })
+        .catch(function() {});
     }
 
     function renderAll() {
@@ -410,6 +449,7 @@
           if (dlPollTimer) { clearInterval(dlPollTimer); dlPollTimer = null; }
           dlData = d;
           if (mlData) renderAll();
+          loadCurves();
         })
         .catch(function() {});
     }

@@ -251,7 +251,7 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     rows = c.execute(
         "SELECT content, rating FROM comments_valid "
         "WHERE content != '' AND rating IS NOT NULL "
-        "ORDER BY RANDOM() LIMIT ?",
+        "ORDER BY CAST(rowid * 10007 % 100003 AS INTEGER) LIMIT ?",
         (n_samples,),
     ).fetchall()
 
@@ -306,23 +306,20 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     best_state = None
     patience = 0
 
+    total_epochs = 30
+    t_start = time.time()
     total_batches = len(train_loader)
-    for epoch in range(30):
+    history_2cls = []
+    for epoch in range(total_epochs):
         model.train()
-        train_loss = 0
         t_epoch = time.time()
-        for bi, (batch_x, batch_y) in enumerate(train_loader):
+        for batch_x, batch_y in train_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             optimizer.zero_grad()
             logits = model(batch_x, punct_indices=punct_indices)
             loss = criterion(logits, batch_y)
             loss.backward()
             optimizer.step()
-            train_loss += loss.item()
-            pct = int((bi + 1) / total_batches * 20)
-            bar = "█" * pct + "░" * (20 - pct)
-            sys.stdout.write(f"\r  [2cls epoch {epoch+1:2d}] [{bar}] {bi+1:>6d}/{total_batches}")
-            sys.stdout.flush()
 
         model.eval()
         val_preds, val_labels = [], []
@@ -334,11 +331,30 @@ def train_bilstm_attn(db_manager, n_samples=15000):
                 val_preds.extend(preds)
                 val_labels.extend(batch_y.numpy())
         val_f1 = f1_score(val_labels, val_preds, average='binary')
+        val_acc = accuracy_score(val_labels, val_preds)
         scheduler.step(1 - val_f1)
-        elapsed = int(time.time() - t_epoch)
-        m = f"{int(elapsed/60)}m{elapsed%60:02d}s"
-        tag = " ↑" if val_f1 > best_f1 else f" · stop{patience+1}/5"
-        print(f"\r  [2cls epoch {epoch+1:2d}] done | f1={val_f1:.4f} best={best_f1:.4f} | {m}{tag}" + " " * 20, flush=True)
+
+        history_2cls.append({
+            "epoch": epoch + 1,
+            "val_f1": round(float(val_f1), 4),
+            "val_acc": round(float(val_acc), 4),
+            "epoch_time": int(time.time() - t_epoch),
+        })
+
+        e_elapsed = int(time.time() - t_epoch)
+        total_elapsed = int(time.time() - t_start)
+        if epoch > 0:
+            eta = total_elapsed * (total_epochs - epoch) // epoch
+        else:
+            eta = 0
+        tag = "↑" if val_f1 > best_f1 else f"·stop{patience+1}/5"
+        pct = int((epoch + 1) / total_epochs * 20)
+        bar = "█" * pct + "░" * (20 - pct)
+        print(f"  [BiLSTM 2cls] [{bar}] epoch {epoch+1:2d}/{total_epochs} | "
+              f"{total_batches}batches/{e_elapsed}s | "
+              f"f1={val_f1:.4f} best={best_f1:.4f} {tag} | "
+              f"elapsed {total_elapsed//60}m{total_elapsed%60:02d}s ETA {eta//60}m{eta%60:02d}s",
+              flush=True)
 
         if val_f1 > best_f1:
             best_f1 = val_f1
@@ -352,6 +368,9 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     model.load_state_dict(best_state)
     binary_metrics = _evaluate_binary(model, test_loader, device, punct_indices)
     print(f"[sentiment_dl] 二分类: acc={binary_metrics['accuracy']}, f1={binary_metrics['f1']}", flush=True)
+
+    train_metrics_2cls = _evaluate_binary(model, train_loader, device, punct_indices)
+    print(f"[sentiment_dl] 二分类训练集: acc={train_metrics_2cls['accuracy']}, f1={train_metrics_2cls['f1']}", flush=True)
 
     binary_state = best_state
 
@@ -370,22 +389,18 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     patience_5 = 0
 
     total5_batches = len(train5_loader)
-    for epoch in range(30):
+    t_start5 = time.time()
+    history_5cls = []
+    for epoch in range(total_epochs):
         model5.train()
-        train_loss = 0
         t_epoch = time.time()
-        for bi, (batch_x, batch_y) in enumerate(train5_loader):
+        for batch_x, batch_y in train5_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             optimizer5.zero_grad()
             logits = model5(batch_x, punct_indices=punct_indices)
             loss = criterion(logits, batch_y)
             loss.backward()
             optimizer5.step()
-            train_loss += loss.item()
-            pct = int((bi + 1) / total5_batches * 20)
-            bar = "█" * pct + "░" * (20 - pct)
-            sys.stdout.write(f"\r  [5cls epoch {epoch+1:2d}] [{bar}] {bi+1:>6d}/{total5_batches}")
-            sys.stdout.flush()
 
         model5.eval()
         val_preds_5, val_labels_5 = [], []
@@ -397,11 +412,30 @@ def train_bilstm_attn(db_manager, n_samples=15000):
                 val_preds_5.extend(preds)
                 val_labels_5.extend(batch_y.numpy())
         val_f1_5 = f1_score(val_labels_5, val_preds_5, average='macro')
+        val_acc_5 = accuracy_score(val_labels_5, val_preds_5)
         scheduler5.step(1 - val_f1_5)
-        elapsed = int(time.time() - t_epoch)
-        m = f"{int(elapsed/60)}m{elapsed%60:02d}s"
-        tag = " ↑" if val_f1_5 > best_f1_5 else f" · stop{patience_5+1}/5"
-        print(f"\r  [5cls epoch {epoch+1:2d}] done | f1={val_f1_5:.4f} best={best_f1_5:.4f} | {m}{tag}" + " " * 20, flush=True)
+
+        history_5cls.append({
+            "epoch": epoch + 1,
+            "val_f1": round(float(val_f1_5), 4),
+            "val_acc": round(float(val_acc_5), 4),
+            "epoch_time": int(time.time() - t_epoch),
+        })
+
+        e_elapsed = int(time.time() - t_epoch)
+        total_elapsed = int(time.time() - t_start5)
+        if epoch > 0:
+            eta = total_elapsed * (total_epochs - epoch) // epoch
+        else:
+            eta = 0
+        tag = "↑" if val_f1_5 > best_f1_5 else f"·stop{patience_5+1}/5"
+        pct = int((epoch + 1) / total_epochs * 20)
+        bar = "█" * pct + "░" * (20 - pct)
+        print(f"  [BiLSTM 5cls] [{bar}] epoch {epoch+1:2d}/{total_epochs} | "
+              f"{total5_batches}batches/{e_elapsed}s | "
+              f"f1={val_f1_5:.4f} best={best_f1_5:.4f} {tag} | "
+              f"elapsed {total_elapsed//60}m{total_elapsed%60:02d}s ETA {eta//60}m{eta%60:02d}s",
+              flush=True)
 
         if val_f1_5 > best_f1_5:
             best_f1_5 = val_f1_5
@@ -416,11 +450,27 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     five_metrics = _evaluate_five_class(model5, test5_loader, device, punct_indices)
     print(f"[sentiment_dl] 五分类: acc={five_metrics['accuracy']}, f1_macro={five_metrics['f1_macro']}", flush=True)
 
+    train5_m = _evaluate_five_class(model5, train5_loader, device, punct_indices)
+    print(f"[sentiment_dl] 五分类训练集: acc={train5_m['accuracy']}, f1_macro={train5_m['f1_macro']}", flush=True)
+
     training_time = round(time.time() - t0, 1)
     num_params = sum(p.numel() for p in model.parameters())
 
     torch.save(binary_state, os.path.join(SENTIMENT_CACHE_DIR, "dl_model_binary.pt"))
     torch.save(best_state_5, os.path.join(SENTIMENT_CACHE_DIR, "dl_model_five.pt"))
+
+    curves_dir = os.path.join(SENTIMENT_CACHE_DIR, "curves")
+    os.makedirs(curves_dir, exist_ok=True)
+    with open(os.path.join(curves_dir, "dl_2cls_history.json"), "w", encoding="utf-8") as f:
+        json.dump(history_2cls, f, ensure_ascii=False, indent=2)
+    with open(os.path.join(curves_dir, "dl_5cls_history.json"), "w", encoding="utf-8") as f:
+        json.dump(history_5cls, f, ensure_ascii=False, indent=2)
+    dl_curves = {
+        "2cls": {"train": train_metrics_2cls, "test": binary_metrics},
+        "5cls": {"train": {"accuracy": train5_m["accuracy"], "f1_macro": train5_m["f1_macro"]}, "test": {"accuracy": five_metrics["accuracy"], "f1_macro": five_metrics["f1_macro"]}},
+    }
+    with open(os.path.join(curves_dir, "dl_train_metrics.json"), "w", encoding="utf-8") as f:
+        json.dump(dl_curves, f, ensure_ascii=False, indent=2)
 
     return {
         "binary": binary_metrics,

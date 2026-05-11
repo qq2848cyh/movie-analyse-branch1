@@ -1,3 +1,5 @@
+import os
+import time
 import numpy as np
 import json
 from typing import Dict, List, Optional
@@ -33,7 +35,7 @@ class SentimentAnalyzer:
         rows = c.execute(
             "SELECT content, rating, comment_time FROM comments_valid "
             "WHERE content != '' AND rating IS NOT NULL "
-            "ORDER BY RANDOM() LIMIT ?",
+            "ORDER BY CAST(rowid * 10007 % 100003 AS INTEGER) LIMIT ?",
             (n_samples,),
         ).fetchall()
         return rows
@@ -44,6 +46,7 @@ class SentimentAnalyzer:
 
         samples = self._load_samples(n_samples)
         texts = [s["content"] for s in samples]
+        total = len(texts)
         ratings = [s["rating"] for s in samples]
         labels_binary = [1 if r >= 4 else 0 for r in ratings]
         labels_five = [int(r) - 1 for r in ratings]
@@ -64,17 +67,10 @@ class SentimentAnalyzer:
                 and any("\u4e00" <= c <= "\u9fff" for c in w)
             ]
 
-        print("[sentiment] tokenizing...", flush=True)
-        tokenized = []
-        total = len(texts)
-        checkpoint = max(1, total // 40)
-        for i, t in enumerate(texts):
-            tokenized.append(" ".join(tokenize(t)))
-            if (i + 1) % checkpoint == 0 or i + 1 == total:
-                pct = int((i + 1) / total * 20)
-                bar = "\u2588" * pct + "\u2591" * (20 - pct)
-                print(f"\r  [tokenize] [{bar}] {i+1}/{total}", end="", flush=True)
-        print("", flush=True)
+        print(f"[sentiment] tokenizing ({total} samples)...", flush=True)
+        t_tok = time.time()
+        tokenized = [" ".join(tokenize(t)) for t in texts]
+        print(f"[sentiment] tokenizing done ({int(time.time()-t_tok)}s)", flush=True)
 
         self.vectorizer = TfidfVectorizer(
             max_features=5000, ngram_range=(1, 2), sublinear_tf=True
@@ -103,16 +99,16 @@ class SentimentAnalyzer:
             "NaiveBayes": MultinomialNB(alpha=0.5),
             "LogisticRegression": LogisticRegression(C=1.0, max_iter=1000, random_state=42),
             "LightGBM": lgb.LGBMClassifier(
-                n_estimators=150, max_depth=7, learning_rate=0.05,
+                n_estimators=800, max_depth=10, learning_rate=0.03,
+                min_child_samples=50,
                 random_state=42, verbose=-1, force_row_wise=True,
             ),
         }
 
-        print("[sentiment] training binary classification...", flush=True)
+        print("[sentiment] training binary classification (3 models)...", flush=True)
+        t_bin = time.time()
         for name, model in models.items():
-            print(f"  [{name}] 5-fold CV...", end="", flush=True)
             cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=1)
-            print(f" done", flush=True)
             model.fit(X_train, y_train)
             preds_test = model.predict(X_test)
             self.models[name] = model
@@ -124,19 +120,30 @@ class SentimentAnalyzer:
                 "cv_mean": round(float(cv_scores.mean()), 4),
                 "cv_std": round(float(cv_scores.std()), 4),
             }
-            print(f"  {name}: test_acc={self.test_results[name]['accuracy']}, f1={self.test_results[name]['f1']}", flush=True)
+        print(f"  LightGBM: acc={self.test_results['LightGBM']['accuracy']:.4f} f1={self.test_results['LightGBM']['f1']:.4f} "
+              f"({int(time.time()-t_bin)}s)", flush=True)
+
+        preds_train = self.models["LightGBM"].predict(X_train)
+        train_metrics = {
+            "accuracy": round(float(accuracy_score(y_train, preds_train)), 4),
+            "precision": round(float(precision_score(y_train, preds_train)), 4),
+            "recall": round(float(recall_score(y_train, preds_train)), 4),
+            "f1": round(float(f1_score(y_train, preds_train)), 4),
+        }
+        print(f"  LightGBM_train: acc={train_metrics['accuracy']:.4f} f1={train_metrics['f1']:.4f}", flush=True)
+        self.ml_train_metrics = {"LightGBM": {"train": train_metrics, "test": self.test_results["LightGBM"]}}
 
         print("[sentiment] tuning LightGBM...", flush=True)
         try:
             param_grid = {
-                "n_estimators": [80, 150],
-                "max_depth": [5, 7, 9],
-                "learning_rate": [0.03, 0.07],
+                "learning_rate": [0.02, 0.03, 0.05],
             }
             grid = GridSearchCV(
-                lgb.LGBMClassifier(random_state=42, verbose=-1, force_row_wise=True),
-                param_grid, cv=3, scoring="accuracy", n_jobs=1, verbose=1
+                lgb.LGBMClassifier(n_estimators=600, max_depth=10, min_child_samples=50,
+                                   random_state=42, verbose=-1, force_row_wise=True),
+                param_grid, cv=2, scoring="accuracy", n_jobs=1, verbose=0
             )
+            t_gs = time.time()
             grid.fit(X_train, y_train)
             best_lgb = grid.best_estimator_
             best_lgb_preds = best_lgb.predict(X_test)
@@ -148,23 +155,31 @@ class SentimentAnalyzer:
                 "best_params": str(grid.best_params_),
             }
             self.models["LightGBM_tuned"] = best_lgb
-            print(f"  LightGBM_tuned: acc={self.test_results['LightGBM_tuned']['accuracy']}, params={grid.best_params_}", flush=True)
+            print(f"  LightGBM_tuned: acc={self.test_results['LightGBM_tuned']['accuracy']} "
+                  f"params={grid.best_params_} ({int(time.time()-t_gs)}s)", flush=True)
+            tuned_train_preds = best_lgb.predict(X_train)
+            tuned_train = {
+                "accuracy": round(float(accuracy_score(y_train, tuned_train_preds)), 4),
+                "f1": round(float(f1_score(y_train, tuned_train_preds)), 4),
+            }
+            print(f"  LightGBM_tuned_train: acc={tuned_train['accuracy']:.4f} f1={tuned_train['f1']:.4f}", flush=True)
+            self.ml_train_metrics["LightGBM_tuned"] = {"train": tuned_train, "test": self.test_results["LightGBM_tuned"]}
         except Exception as e:
             print(f"  LightGBM tuning skipped: {e}", flush=True)
 
         print("[sentiment] training 5-class classification...", flush=True)
+        t_5cls = time.time()
         five_models = {
             "LogisticRegression_5cls": LogisticRegression(C=1.0, max_iter=1500, random_state=42),
             "LightGBM_5cls": lgb.LGBMClassifier(
-                n_estimators=120, max_depth=7, learning_rate=0.05,
+                n_estimators=500, max_depth=10, learning_rate=0.03,
+                min_child_samples=50,
                 random_state=42, verbose=-1, force_row_wise=True,
                 num_class=5,
             ),
         }
         for name, model in five_models.items():
-            print(f"  [{name}] fitting...", end="", flush=True)
             model.fit(X_train, y5_train)
-            print(" done", flush=True)
             preds = model.predict(X_test)
             acc = accuracy_score(y5_test, preds)
             cm = confusion_matrix(y5_test, preds, labels=[0, 1, 2, 3, 4])
@@ -177,7 +192,12 @@ class SentimentAnalyzer:
                 "per_class_f1": [round(float(v), 4) for v in f1_score(y5_test, preds, average=None, labels=[0,1,2,3,4])],
             }
             self.best_model = model
-            print(f"  {name}: acc={acc:.4f}", flush=True)
+        print(f"  LightGBM_5cls: acc={self.test_results['LightGBM_5cls']['accuracy']:.4f} "
+              f"({int(time.time()-t_5cls)}s)", flush=True)
+        preds5_train = self.models["LightGBM_5cls"].predict(X_train)
+        train5_acc = round(float(accuracy_score(y5_train, preds5_train)), 4)
+        print(f"  LightGBM_5cls_train: acc={train5_acc:.4f}", flush=True)
+        self.ml_train_metrics["LightGBM_5cls"] = {"train": {"accuracy": train5_acc}, "test": {"accuracy": self.test_results["LightGBM_5cls"]["accuracy"]}}
 
         self.trained = True
 
@@ -277,6 +297,12 @@ class SentimentAnalyzer:
             train_result = {"test_results": self.test_results}
 
         trend_data = self.get_trend_data()
+
+        curves_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "cache", "sentiment", "curves")
+        os.makedirs(curves_dir, exist_ok=True)
+        if hasattr(self, "ml_train_metrics") and self.ml_train_metrics:
+            with open(os.path.join(curves_dir, "ml_train_metrics.json"), "w", encoding="utf-8") as f:
+                json.dump(self.ml_train_metrics, f, ensure_ascii=False, indent=2)
 
         return {
             "classification": train_result,

@@ -308,8 +308,8 @@ def _warmup_thread():
             print("[warmup] 情感分析完成 ✓", flush=True)
 
         if need_sentiment_dl:
-            print("[warmup] 训练 BiLSTM-Attention 模型（约需 2-3 分钟）...", flush=True)
-            _sentiment_dl_cache = train_bilstm_attn(db, n_samples=50000)
+            print("[warmup] 训练 BiLSTM-Attention 模型（约需 5-6 小时）...", flush=True)
+            _sentiment_dl_cache = train_bilstm_attn(db, n_samples=2000000)
             _save_pickle_cache(CACHE_SENTIMENT_DL, _sentiment_dl_cache, "情感分析DL")
             print("[warmup] BiLSTM-Attention 训练完成 ✓", flush=True)
 
@@ -414,6 +414,18 @@ def api_sentiment_dl_attention():
         return jsonify(_sanitize_for_json(result))
     except Exception as e:
         return jsonify({"error": f"注意力分析失败: {e}"})
+
+
+@app.route("/api/analysis/sentiment/dl/curves")
+def api_sentiment_dl_curves():
+    curves_dir = os.path.join(CACHE_DIR, "sentiment", "curves")
+    result = {}
+    for fn in ["dl_2cls_history.json", "dl_5cls_history.json", "dl_train_metrics.json", "ml_train_metrics.json"]:
+        fp = os.path.join(curves_dir, fn)
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8") as f:
+                result[fn.replace(".json", "")] = json.load(f)
+    return jsonify(result)
 
 
 @app.route("/api/analysis/recommend/by_movie")
@@ -669,12 +681,7 @@ def api_export_results():
         }
     })
 
-    output_path = os.path.join(root_dir, "data", "analysis_results.json")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(export, f, ensure_ascii=False, indent=2)
-
-    return jsonify({"status": "ok", "path": output_path, "summary": {
+    return jsonify({"status": "ok", "summary": {
         k: list(v.keys()) for k, v in export.items()
     }})
 

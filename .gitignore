@@ -7,3 +7,6 @@
 *.pkl
 data/
 README.md
+.idea/
+.venv/
+.vscode/

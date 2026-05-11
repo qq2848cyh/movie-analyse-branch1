@@ -333,7 +333,7 @@ class NetworkAnalyzer:
             "node_community": node_community,
         }
 
-    def get_force_graph_data(self, max_nodes: int = 200) -> Dict:
+    def get_force_graph_data(self, max_nodes: int = 300) -> Dict:
         G = self.graph
         largest_cc = G.subgraph(max(nx.connected_components(G), key=len))
 
