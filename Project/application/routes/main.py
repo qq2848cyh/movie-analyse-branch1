@@ -344,11 +344,11 @@ def _warmup_thread():
         err_msg = f"{e}\n{traceback.format_exc()}"
         print(f"[warmup] 预热失败: {err_msg}", flush=True)
         if _network_cache is None:
-            _network_cache = {"status": "error", "message": str(e)}
+            _network_cache = {"status": "error", "message": "网络分析失败，请稍后重试"}
         if _sentiment_cache is None:
-            _sentiment_cache = {"status": "error", "message": str(e)}
+            _sentiment_cache = {"status": "error", "message": "情感分析失败，请稍后重试"}
         if _sentiment_dl_cache is None:
-            _sentiment_dl_cache = {"status": "error", "message": str(e)}
+            _sentiment_dl_cache = {"status": "error", "message": "深度学习情感分析失败，请稍后重试"}
 
 
 def _ensure_warmup():
@@ -418,7 +418,8 @@ def api_sentiment_dl_attention():
         result = get_attention_visualization(text)
         return jsonify(_sanitize_for_json(result))
     except Exception as e:
-        return jsonify({"error": f"注意力分析失败: {e}"})
+        print(f"[sentiment_dl] 注意力分析失败: {e}", flush=True)
+        return jsonify({"error": "注意力分析失败，请稍后重试"})
 
 
 @app.route("/api/analysis/sentiment/dl/curves")
@@ -620,7 +621,8 @@ def api_recommend_eval():
             from application.services.bigdata_recommend_engine import generate_eval_report
             generate_eval_report()
         except Exception as e:
-            return jsonify({"error": f"评估报告生成失败: {e}"})
+            print(f"[recommend] 评估报告生成失败: {e}", flush=True)
+            return jsonify({"error": "评估报告生成失败，请稍后重试"})
     if os.path.exists(eval_path):
         with open(eval_path, "r", encoding="utf-8") as f:
             return jsonify(json.load(f))
@@ -659,7 +661,8 @@ def api_movie_detail():
             "source": best["source"],
         })
     except Exception as e:
-        return jsonify({"error": f"查询失败: {e}"})
+        print(f"[movie] 详情查询失败: {e}", flush=True)
+        return jsonify({"error": "查询失败，请稍后重试"})
 
 
 @app.route("/api/analysis/export")
