@@ -18,24 +18,28 @@ from sklearn.metrics import (
 )
 from gensim.models import Word2Vec
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(os.path.dirname(current_dir))
-SENTIMENT_CACHE_DIR = os.path.join(root_dir, "data", "cache", "sentiment")
+from .stopwords import get_dl_stop_words
 
-VOCAB_SIZE = 15000
-EMBED_DIM = 200
-HIDDEN_DIM = 128
-MAX_SEQ_LEN = 100
-BATCH_SIZE = 64
+try:
+    from ..config import (
+        VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, MAX_SEQ_LEN, BATCH_SIZE,
+        CACHE_SENTIMENT_DIR, WORD2VEC_PATH, WORD2IDX_PATH, EMBED_MATRIX_PATH,
+        PUNCT_INDICES_PATH, DL_MODEL_BINARY_PATH, DL_MODEL_FIVE_PATH,
+        SENTIMENT_CURVES_DIR
+    )
+except (ImportError, ValueError):
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import (
+        VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, MAX_SEQ_LEN, BATCH_SIZE,
+        CACHE_SENTIMENT_DIR, WORD2VEC_PATH, WORD2IDX_PATH, EMBED_MATRIX_PATH,
+        PUNCT_INDICES_PATH, DL_MODEL_BINARY_PATH, DL_MODEL_FIVE_PATH,
+        SENTIMENT_CURVES_DIR
+    )
 
-DL_STOP_WORDS = {
-    "的", "了", "是", "在", "和", "就", "也",
-    "都", "我", "你", "他", "她", "它", "这",
-    "那", "吗", "呢", "吧", "啊", "哦", "嗯",
-    "着", "过", "被", "把", "让", "对", "从",
-    "但", "与", "而", "或", "及", "之", "等",
-    "因为", "所以",
-}
+SENTIMENT_CACHE_DIR = CACHE_SENTIMENT_DIR
+
+DL_STOP_WORDS = get_dl_stop_words()
 
 PUNCT_CHARS = set("，。！？；：、…～—·,.:;!?\"'()[]{}<>/-_=+@#$%^&*|\\`~ \t\n\r")
 
@@ -56,21 +60,16 @@ def tokenize_dl(text):
 
 
 def _build_vocab_and_word2vec(db_manager):
-    word2idx_path = os.path.join(SENTIMENT_CACHE_DIR, "word2idx.json")
-    w2v_path = os.path.join(SENTIMENT_CACHE_DIR, "word2vec_200d.bin")
-    embed_matrix_path = os.path.join(SENTIMENT_CACHE_DIR, "embedding_matrix.npy")
-    punct_indices_path = os.path.join(SENTIMENT_CACHE_DIR, "punct_indices.json")
-
-    if os.path.exists(word2idx_path) and os.path.exists(w2v_path) and os.path.exists(embed_matrix_path):
-        with open(word2idx_path, "r", encoding="utf-8") as f:
+    if os.path.exists(WORD2IDX_PATH) and os.path.exists(WORD2VEC_PATH) and os.path.exists(EMBED_MATRIX_PATH):
+        with open(WORD2IDX_PATH, "r", encoding="utf-8") as f:
             word2idx = json.load(f)
-        embed_matrix = np.load(embed_matrix_path)
-        if os.path.exists(punct_indices_path):
-            with open(punct_indices_path, "r") as f:
+        embed_matrix = np.load(EMBED_MATRIX_PATH)
+        if os.path.exists(PUNCT_INDICES_PATH):
+            with open(PUNCT_INDICES_PATH, "r") as f:
                 punct_indices = set(json.load(f))
         else:
             punct_indices = _build_punct_indices(word2idx)
-            with open(punct_indices_path, "w") as f:
+            with open(PUNCT_INDICES_PATH, "w") as f:
                 json.dump(list(punct_indices), f)
         print("[sentiment_dl] 词表与词向量从缓存加载 ✓", flush=True)
         return word2idx, embed_matrix, punct_indices
@@ -96,12 +95,12 @@ def _build_vocab_and_word2vec(db_manager):
         word2idx[w] = len(word2idx)
 
     os.makedirs(SENTIMENT_CACHE_DIR, exist_ok=True)
-    with open(word2idx_path, "w", encoding="utf-8") as f:
+    with open(WORD2IDX_PATH, "w", encoding="utf-8") as f:
         json.dump(word2idx, f, ensure_ascii=False)
     print(f"[sentiment_dl] 词表已保存 ({len(word2idx)} 词)", flush=True)
 
     punct_indices = _build_punct_indices(word2idx)
-    with open(punct_indices_path, "w") as f:
+    with open(PUNCT_INDICES_PATH, "w") as f:
         json.dump(list(punct_indices), f)
     print(f"[sentiment_dl] 标点索引已记录 ({len(punct_indices)} 个)", flush=True)
 
@@ -114,14 +113,14 @@ def _build_vocab_and_word2vec(db_manager):
         sg=1,
         workers=4,
     )
-    w2v_model.save(w2v_path)
+    w2v_model.save(WORD2VEC_PATH)
     print("[sentiment_dl] Word2Vec 已保存", flush=True)
 
     embed_matrix = np.zeros((VOCAB_SIZE, EMBED_DIM), dtype=np.float32)
     for word, idx in word2idx.items():
         if word in w2v_model.wv:
             embed_matrix[idx] = w2v_model.wv[word]
-    np.save(embed_matrix_path, embed_matrix)
+    np.save(EMBED_MATRIX_PATH, embed_matrix)
 
     return word2idx, embed_matrix, punct_indices
 
@@ -456,20 +455,19 @@ def train_bilstm_attn(db_manager, n_samples=15000):
     training_time = round(time.time() - t0, 1)
     num_params = sum(p.numel() for p in model.parameters())
 
-    torch.save(binary_state, os.path.join(SENTIMENT_CACHE_DIR, "dl_model_binary.pt"))
-    torch.save(best_state_5, os.path.join(SENTIMENT_CACHE_DIR, "dl_model_five.pt"))
+    torch.save(binary_state, DL_MODEL_BINARY_PATH)
+    torch.save(best_state_5, DL_MODEL_FIVE_PATH)
 
-    curves_dir = os.path.join(SENTIMENT_CACHE_DIR, "curves")
-    os.makedirs(curves_dir, exist_ok=True)
-    with open(os.path.join(curves_dir, "dl_2cls_history.json"), "w", encoding="utf-8") as f:
+    os.makedirs(SENTIMENT_CURVES_DIR, exist_ok=True)
+    with open(os.path.join(SENTIMENT_CURVES_DIR, "dl_2cls_history.json"), "w", encoding="utf-8") as f:
         json.dump(history_2cls, f, ensure_ascii=False, indent=2)
-    with open(os.path.join(curves_dir, "dl_5cls_history.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(SENTIMENT_CURVES_DIR, "dl_5cls_history.json"), "w", encoding="utf-8") as f:
         json.dump(history_5cls, f, ensure_ascii=False, indent=2)
     dl_curves = {
         "2cls": {"train": train_metrics_2cls, "test": binary_metrics},
         "5cls": {"train": {"accuracy": train5_m["accuracy"], "f1_macro": train5_m["f1_macro"]}, "test": {"accuracy": five_metrics["accuracy"], "f1_macro": five_metrics["f1_macro"]}},
     }
-    with open(os.path.join(curves_dir, "dl_train_metrics.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(SENTIMENT_CURVES_DIR, "dl_train_metrics.json"), "w", encoding="utf-8") as f:
         json.dump(dl_curves, f, ensure_ascii=False, indent=2)
 
     return {
@@ -481,18 +479,12 @@ def train_bilstm_attn(db_manager, n_samples=15000):
 
 
 def _load_model_and_resources():
-    word2idx_path = os.path.join(SENTIMENT_CACHE_DIR, "word2idx.json")
-    embed_matrix_path = os.path.join(SENTIMENT_CACHE_DIR, "embedding_matrix.npy")
-    binary_weights_path = os.path.join(SENTIMENT_CACHE_DIR, "dl_model_binary.pt")
-    five_weights_path = os.path.join(SENTIMENT_CACHE_DIR, "dl_model_five.pt")
-    punct_indices_path = os.path.join(SENTIMENT_CACHE_DIR, "punct_indices.json")
-
-    with open(word2idx_path, "r", encoding="utf-8") as f:
+    with open(WORD2IDX_PATH, "r", encoding="utf-8") as f:
         word2idx = json.load(f)
-    embed_matrix = np.load(embed_matrix_path)
+    embed_matrix = np.load(EMBED_MATRIX_PATH)
 
-    if os.path.exists(punct_indices_path):
-        with open(punct_indices_path, "r") as f:
+    if os.path.exists(PUNCT_INDICES_PATH):
+        with open(PUNCT_INDICES_PATH, "r") as f:
             punct_indices = set(json.load(f))
     else:
         punct_indices = _build_punct_indices(word2idx)
@@ -501,13 +493,13 @@ def _load_model_and_resources():
 
     model = BiLSTMAttention(vocab_size=VOCAB_SIZE, num_classes=2)
     model.embedding.weight.data.copy_(torch.from_numpy(embed_matrix))
-    model.load_state_dict({k: v for k, v in torch.load(binary_weights_path, map_location=device).items()})
+    model.load_state_dict({k: v for k, v in torch.load(DL_MODEL_BINARY_PATH, map_location=device).items()})
     model.to(device)
     model.eval()
 
     model5 = BiLSTMAttention(vocab_size=VOCAB_SIZE, num_classes=5)
     model5.embedding.weight.data.copy_(torch.from_numpy(embed_matrix))
-    model5.load_state_dict({k: v for k, v in torch.load(five_weights_path, map_location=device).items()})
+    model5.load_state_dict({k: v for k, v in torch.load(DL_MODEL_FIVE_PATH, map_location=device).items()})
     model5.to(device)
     model5.eval()
 

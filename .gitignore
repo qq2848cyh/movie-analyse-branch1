@@ -10,3 +10,5 @@ README.md
 .idea/
 .venv/
 .vscode/
+backup/
+thesis_requirement/

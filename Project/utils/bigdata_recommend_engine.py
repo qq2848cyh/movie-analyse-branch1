@@ -5,9 +5,6 @@
   - TF-IDF       : 基于内容的余弦相似度基线（全量双库）
   - TruncatedSVD : 评分矩阵降维协同过滤（替代 LightFM / MF / NCF）
   - BGE-Large-Zh : 中文深度语义推荐（BAAI/bge-large-zh-v1.5, 1024dim, FP16）
-
-缓存目录: data/cache/recommend/
-评估报告: data/cache/recommend/recommend_eval.json
 """
 
 import os
@@ -17,6 +14,26 @@ import time
 import sqlite3
 import numpy as np
 
+
+from .stopwords import get_recommend_stop_words
+
+# 尝试相对导入，如果失败则使用绝对导入
+try:
+    from ..config import (
+        CACHE_RECOMMEND_DIR, CACHE_TFIDF, CACHE_SVD, CACHE_SVD_NPZ,
+        CACHE_SBERT, CACHE_SBERT_EMB, EVAL_REPORT_PATH, NEW_MOVIES_DB_PATH,
+        BIGDATA_DB_PATH, RECOMMEND_EVAL_SAMPLES, RECOMMEND_MIN_VOTES
+    )
+except (ImportError, ValueError):
+    # 如果是独立运行，从 config 直接导入
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import (
+        CACHE_RECOMMEND_DIR, CACHE_TFIDF, CACHE_SVD, CACHE_SVD_NPZ,
+        CACHE_SBERT, CACHE_SBERT_EMB, EVAL_REPORT_PATH, NEW_MOVIES_DB_PATH,
+        BIGDATA_DB_PATH, RECOMMEND_EVAL_SAMPLES, RECOMMEND_MIN_VOTES
+    )
+
 HAS_TORCH = False
 try:
     import torch
@@ -24,21 +41,15 @@ try:
 except ImportError:
     pass
 
-CACHE_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "cache", "recommend",
-)
+CACHE_DIR = CACHE_RECOMMEND_DIR
 
 
 # ==================== 1. 统一电影数据加载 ====================
 
 def _load_unified_movies():
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
     movie_map = {}
 
-    new_db_path = os.path.join(root, "data", "new_movies.db")
-    conn = sqlite3.connect(new_db_path)
+    conn = sqlite3.connect(NEW_MOVIES_DB_PATH)
     conn.row_factory = sqlite3.Row
     new_rows = conn.execute(
         "SELECT movie_id, title, rating, total_ratings, directors, actors, "
@@ -66,8 +77,7 @@ def _load_unified_movies():
     conn.close()
     print(f"[recommend] 从 new_movies.db 加载 {len(movie_map)} 部电影")
 
-    bigdata_db_path = os.path.join(root, "data", "bigdata_movies.db")
-    conn2 = sqlite3.connect(bigdata_db_path)
+    conn2 = sqlite3.connect(BIGDATA_DB_PATH)
     conn2.row_factory = sqlite3.Row
     big_rows = conn2.execute(
         "SELECT movie_id, name, douban_score, douban_votes, directors, actors, "
@@ -113,7 +123,7 @@ _UNIFIED_EVAL_SAMPLE = 200
 
 def _get_common_test_set(movies):
     rng = np.random.RandomState(42)
-    n = min(_UNIFIED_EVAL_SAMPLE, len(movies))
+    n = min(RECOMMEND_EVAL_SAMPLES, len(movies))
     return rng.choice(len(movies), n, replace=False)
 
 
@@ -228,9 +238,6 @@ def _refresh_metrics_if_needed(data, nn_index, movies, query_builder, model_labe
 
 # ==================== 3. 模型 A: TF-IDF 双库基线 ====================
 
-CACHE_TFIDF = os.path.join(CACHE_DIR, "tfidf_model.pkl")
-
-
 def train_tfidf(force=False):
     if not force and os.path.exists(CACHE_TFIDF):
         with open(CACHE_TFIDF, "rb") as f:
@@ -244,10 +251,10 @@ def train_tfidf(force=False):
     t0 = time.time()
 
     movies = _load_unified_movies()
-    movies = [m for m in movies if m["votes"] >= 10]
+    movies = [m for m in movies if m["votes"] >= RECOMMEND_MIN_VOTES]
     print(f"[recommend] TF-IDF 过滤后 (votes>=10): {len(movies)} 部")
 
-    stop_words = _get_stop_words()
+    stop_words = get_recommend_stop_words()
 
     docs = []
     for m in movies:
@@ -314,10 +321,6 @@ def train_tfidf(force=False):
 
 # ==================== 4. 模型 B: TruncatedSVD 协同过滤 ====================
 
-CACHE_SVD = os.path.join(CACHE_DIR, "svd_model.pkl")
-CACHE_SVD_NPZ = os.path.join(CACHE_DIR, "svd_item_vectors.npz")
-
-
 def train_svd(force=False):
     if not force and os.path.exists(CACHE_SVD) and os.path.exists(CACHE_SVD_NPZ):
         with open(CACHE_SVD, "rb") as f:
@@ -333,11 +336,10 @@ def train_svd(force=False):
     t0 = time.time()
 
     movies = _load_unified_movies()
-    movies = [m for m in movies if m["votes"] >= 10]
+    movies = [m for m in movies if m["votes"] >= RECOMMEND_MIN_VOTES]
     print(f"[recommend] SVD 数据准备: 全库 {len(movies)} 部电影")
 
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    conn = sqlite3.connect(os.path.join(root, "data", "bigdata_movies.db"))
+    conn = sqlite3.connect(BIGDATA_DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT user_md5, movie_id, rating FROM comments_valid
@@ -440,9 +442,6 @@ def train_svd(force=False):
 
 # ==================== 5. 模型 C: BGE-Large-Zh 深度语义推荐 ====================
 
-CACHE_SBERT = os.path.join(CACHE_DIR, "sbert_model.pkl")
-CACHE_SBERT_EMB = os.path.join(CACHE_DIR, "sbert_embeddings.npy")
-
 
 def train_sbert(force=False):
     if not force and os.path.exists(CACHE_SBERT) and os.path.exists(CACHE_SBERT_EMB):
@@ -469,7 +468,7 @@ def train_sbert(force=False):
     t0 = time.time()
 
     movies = _load_unified_movies()
-    movies = [m for m in movies if m["votes"] >= 10]
+    movies = [m for m in movies if m["votes"] >= RECOMMEND_MIN_VOTES]
     print(f"[recommend] BGE-Large 过滤后 (votes>=10): {len(movies)} 部")
 
     model = SentenceTransformer("BAAI/bge-large-zh-v1.5")
@@ -559,7 +558,7 @@ def train_sbert(force=False):
 
 # ==================== 6. 综合评估报告 ====================
 
-EVAL_PATH = os.path.join(CACHE_DIR, "recommend_eval.json")
+
 
 
 def generate_eval_report():
@@ -619,25 +618,11 @@ def generate_eval_report():
             "note": "三组模型使用统一评估框架（200部共用测试集），指标可直接对比",
         }
 
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(EVAL_PATH, "w", encoding="utf-8") as f:
+    os.makedirs(CACHE_RECOMMEND_DIR, exist_ok=True)
+    with open(EVAL_REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
-    print(f"[recommend] 评估报告已保存: {EVAL_PATH}")
+    print(f"[recommend] 评估报告已保存: {EVAL_REPORT_PATH}")
     return report
 
 
-# ==================== 7. 辅助函数 ====================
 
-def _get_stop_words():
-    return {
-        "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-        "一个", "上", "也", "很", "说", "要", "你", "会", "着", "没有", "看",
-        "好", "自己", "这", "他", "她", "们", "那", "什么", "怎么", "可以",
-        "还", "被", "让", "从", "与", "但", "而", "等", "及", "之", "为",
-        "对", "于", "以", "电影", "一部", "真的", "感觉", "觉得", "还是", "不过",
-        "已经", "不是", "就是", "这么", "那么", "一直", "一点", "很多",
-        "出来", "开始", "最后", "比较", "其实", "有点", "因为", "所以",
-        "我们", "他们", "你们", "大家", "但是", "然而",
-        "不错", "喜欢", "好看", "还行", "一般",
-        "演技", "剧情", "导演", "演员", "角色", "故事", "片子", "画面",
-    }

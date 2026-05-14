@@ -18,6 +18,15 @@ from sklearn.metrics import (
 )
 import lightgbm as lgb
 
+from .stopwords import get_ml_stop_words
+
+try:
+    from ..config import SENTIMENT_CURVES_DIR
+except (ImportError, ValueError):
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import SENTIMENT_CURVES_DIR
+
 
 class SentimentAnalyzer:
     def __init__(self, db_manager):
@@ -51,13 +60,7 @@ class SentimentAnalyzer:
         labels_binary = [1 if r >= 4 else 0 for r in ratings]
         labels_five = [int(r) - 1 for r in ratings]
 
-        stop_words = {
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-            "一个", "上", "也", "很", "说", "要", "你", "会", "着", "没有", "看",
-            "好", "自己", "这", "他", "她", "们", "那", "什么", "怎么", "可以",
-            "还", "被", "让", "从", "与", "但", "而", "等", "及", "之", "为",
-            "对", "于", "以", "因为", "所以", "我们", "他们", "但是", "然而",
-        }
+        stop_words = get_ml_stop_words()
 
         def tokenize(text):
             words = jieba.lcut(str(text))
@@ -298,7 +301,7 @@ class SentimentAnalyzer:
 
         trend_data = self.get_trend_data()
 
-        curves_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "cache", "sentiment", "curves")
+        curves_dir = SENTIMENT_CURVES_DIR
         os.makedirs(curves_dir, exist_ok=True)
         if hasattr(self, "ml_train_metrics") and self.ml_train_metrics:
             with open(os.path.join(curves_dir, "ml_train_metrics.json"), "w", encoding="utf-8") as f:

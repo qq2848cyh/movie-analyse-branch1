@@ -4,8 +4,11 @@ import json
 import pandas as pd
 from typing import Optional, Tuple, List, Dict
 
+from .stopwords import get_stop_words
+from .base_manager import BaseMovieManager
 
-class NewMovieManager:
+
+class NewMovieManager(BaseMovieManager):
     """2000+ 电影数据集 SQLite 管理类（替代原 Top250 CSV）"""
 
     TABLE = "movies"
@@ -31,7 +34,7 @@ class NewMovieManager:
     ]
 
     def __init__(self, db_path: str):
-        self.db_path = db_path
+        super().__init__(db_path)
         self._ensure_table()
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -103,12 +106,6 @@ class NewMovieManager:
 
         return total
 
-    def get_total_count(self) -> int:
-        with self._get_conn() as conn:
-            return conn.execute(
-                f"SELECT COUNT(*) FROM {self.TABLE}"
-            ).fetchone()[0]
-
     def get_movies_page(
         self, page: int = 1, per_page: int = 20, search: str = ""
     ) -> Tuple[List[Dict], int]:
@@ -138,6 +135,7 @@ class NewMovieManager:
             ORDER BY rating DESC, total_ratings DESC
             LIMIT ? OFFSET ?
         """
+        conn = self._get_conn()
         rows = conn.execute(sql, params + [per_page, offset]).fetchall()
 
         start_rank = offset + 1
@@ -155,6 +153,7 @@ class NewMovieManager:
                 "country":        row["countries"],
                 "classification": row["genres"],
             })
+        conn.close()
         return results, total
 
     def get_analysis_dataframe(self) -> pd.DataFrame:
@@ -177,15 +176,6 @@ class NewMovieManager:
         return pd.DataFrame(
             columns=["nums-rating", "year", "country", "classification", "director"]
         )
-
-    def get_wordcloud_texts(self) -> Tuple[List[str], List[str]]:
-        with self._get_conn() as conn:
-            rows = conn.execute(
-                f"SELECT title, summary FROM {self.TABLE}"
-            ).fetchall()
-        titles = [r["title"] for r in rows if r["title"]]
-        summaries = [r["summary"] for r in rows if r["summary"]]
-        return titles, summaries
 
     def _load_wc_cache(self) -> Optional[Dict]:
         with self._get_conn() as conn:
@@ -216,17 +206,7 @@ class NewMovieManager:
 
         titles, summaries = self.get_wordcloud_texts()
 
-        stop_words = {
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-            "一个", "上", "也", "很", "说", "要", "你", "会", "着", "没有", "看",
-            "好", "自己", "这", "他", "她", "们", "那", "什么", "怎么", "可以",
-            "还", "被", "让", "从", "与", "但", "而", "等", "及", "之", "为",
-            "对", "于", "以", "电影", "一部", "真的", "感觉", "觉得", "还是", "不过",
-            "已经", "不是", "就是", "这么", "那么", "一直", "一点", "很多",
-            "出来", "开始", "最后", "比较", "其实", "有点", "因为", "所以",
-            "我们", "他们", "你们", "大家", "但是", "然而", "配音", "一次", "为了", "这个",
-            "本片", "一场", "一起",
-        }
+        stop_words = get_stop_words()
 
         def count_chinese_words(texts, top_n=50):
             freq = {}

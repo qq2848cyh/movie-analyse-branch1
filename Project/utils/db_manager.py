@@ -7,6 +7,15 @@ import jieba
 import pandas as pd
 from typing import Optional, Tuple, List, Dict
 
+from .stopwords import get_stop_words
+
+try:
+    from ..config import BIGDATA_CSV_DIR
+except (ImportError, ValueError):
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from config import BIGDATA_CSV_DIR
+
 
 class DBManager:
     """
@@ -25,8 +34,7 @@ class DBManager:
         self._ensure_all_tables()
 
     def _get_csv_dir(self):
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        return os.path.join(os.path.dirname(project_dir), "data", "bigdata")
+        return BIGDATA_CSV_DIR
 
     def _get_conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
@@ -431,7 +439,7 @@ class DBManager:
             ).fetchone()[0]
             batch_size = 50000
             comment_freq = {}
-            stop_words = self._get_stop_words()
+            stop_words = get_stop_words()
             last_id = 0
             while True:
                 rows = conn.execute(
@@ -465,69 +473,9 @@ class DBManager:
 
         return result
 
-    def _get_stop_words(self):
-        return {
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-            "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-            "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
-            "什么", "怎么", "如何", "为什么", "因为", "所以", "但是", "然而",
-            "可以", "这个", "那个", "还", "被", "把", "让", "从", "与", "或",
-            "等", "及", "之", "为", "对", "于", "以", "而", "且", "但",
-            "a", "an", "the", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "can", "shall",
-            "to", "of", "in", "for", "on", "with", "at", "by", "from",
-            "it", "its", "and", "or", "not", "no", "but", "if", "so",
-            "as", "we", "he", "she", "they", "this", "that", "these",
-            "those", "my", "your", "his", "her", "our", "their", "all",
-            "than", "then", "just", "about", "into", "over", "also",
-            "very", "too", "only", "more", "some", "any", "each", "every",
-            "both", "few", "most", "other", "such", "now", "up", "out",
-            "when", "who", "how", "what", "which", "where", "there",
-            "here", "one", "two", "like", "get", "got", "make", "made",
-            "through", "after", "before", "between", "during", "while",
-            "电影", "一部", "真的", "感觉", "觉得", "还是", "不过", "已经",
-            "不是", "就是", "或者", "这么", "那么", "一直", "一点", "很多",
-            "出来", "开始", "最后", "比较", "其实", "有点", "东西", "地方",
-            "因为", "所以", "我们", "他们", "你们", "它们", "自己", "大家",
-            "配音", "一次", "为了", "这个", "本片", "一场", "一起",
-            "不错", "喜欢", "好看", "还行", "一般", "不错看",
-            "演技", "剧情", "导演", "演员", "角色", "故事", "片子", "画面",
-            "觉得", "看到", "知道", "可能", "应该", "这种", "那种",
-            "里面", "那种", "整个", "有人", "一种", "里面", "完全",
-            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-            "10", "20", "30", "100", "200",
-        }
-
     def _count_words(self, text: str, top_n: int = 80, chinese_only: bool = False) -> List[Dict]:
         freq = {}
-        stop_words = {
-            "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一",
-            "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-            "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
-            "什么", "怎么", "如何", "为什么", "因为", "所以", "但是", "然而",
-            "可以", "这个", "那个", "还", "被", "把", "让", "从", "与", "或",
-            "等", "及", "之", "为", "对", "于", "以", "而", "且", "但",
-            "a", "an", "the", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "can", "shall",
-            "to", "of", "in", "for", "on", "with", "at", "by", "from",
-            "it", "its", "and", "or", "not", "no", "but", "if", "so",
-            "as", "we", "he", "she", "they", "this", "that", "these",
-            "those", "my", "your", "his", "her", "our", "their", "all",
-            "than", "then", "just", "about", "into", "over", "also",
-            "very", "too", "only", "more", "some", "any", "each", "every",
-            "both", "few", "most", "other", "such", "now", "up", "out",
-            "when", "who", "how", "what", "which", "where", "there",
-            "here", "one", "two", "like", "get", "got", "make", "made",
-            "through", "after", "before", "between", "during", "while",
-            "电影", "一部", "真的", "感觉", "觉得", "还是", "不过", "已经",
-            "不是", "就是", "或者", "这么", "那么", "一直", "一点", "很多",
-            "出来", "开始", "最后", "比较", "其实", "有点", "东西", "地方",
-            "因为", "所以", "我们", "他们", "你们", "它们", "自己", "大家",
-            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-            "10", "20", "30", "100", "200",
-        }
+        stop_words = get_stop_words()
         for word in text.replace("\n", " ").split():
             word = word.strip("，。！？；：""''（）【】《》、…—·,.!?;:()[]{}<>\"'|/\\@#$%^&*+=~`")
             if len(word) >= 2 and word not in stop_words:
